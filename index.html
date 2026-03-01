@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>PF BRASIL - GESTÃO DE VERBAS</title>
+    <!-- TITULO CURTO FORÇADO PARA O iPHONE LER CORRETAMENTE -->
+    <title>PF Verbas</title>
     
     <!-- Configuração PWA (Aplicações Web Progressivas) -->
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -56,9 +57,9 @@
 
         const REPRESENTATIVES = {
             "DISTRITAL RIO TOTAL": [
-                "CARLOS OTAVIO", "LIVIA NUNES DO AMARAL", 
+                "CARLOS OTAVIO", "LIVIA NUNES DO AMARAL", "GUSTAVO GOMES DE ARAGAO PEDRA E CAL", 
                 "VALERIA DIAS DA COSTA", "THAIS SANTANNA RIBEIRO", "CARLOS EDUARDO DO NASCIMENTO SOARES",
-                "FERNANDA DE JESUS NASCIMENTO",
+                "FERNANDA DE JESUS NASCIMENTO", "SIMONE LIMA DE CARVALHO", "FELIPE GOMES",
                 "ARTHUR MARILAC FERREIRA", "ELIZABETH LIMA DA SILVA", "CARINA CARVALHO DIAS DE AMORIM",
                 "ROSIMERE MARIA DA SILVA FALCAO", "DEBORAH DE ALMEIDA LEITE PINTO DE LACERDA",
                 "ISIS DE OLIVEIRA ALVES", "PATRICIA MEIRE DE SOUZA IAMIM SILVA"
@@ -242,41 +243,20 @@
                 return ceiling - totalUsedFeed;
             }, [budgetCeiling, totalUsedFeed]);
 
-            // =========================================================================
-            // LÓGICA DE EXPORTAÇÃO PARA EXCEL (CSV)
-            // =========================================================================
             const exportToCSV = () => {
                 const dataToExport = currentAdmin ? filteredEntriesAdmin : feedEntries;
-                
-                if (dataToExport.length === 0) {
-                    notify("Não existem dados para exportar.", "error");
-                    return;
-                }
+                if (dataToExport.length === 0) return notify("Não existem dados para exportar.", "error");
 
-                // Usamos ponto e vírgula (;) porque o Excel no Brasil/Europa lê isso melhor
                 const headers = ["Data", "Estrutura", "Solicitante", "Medico/Destinatario", "CRM", "Categoria", "Acao", "Valor", "Observacoes"];
-                
                 const rows = dataToExport.map(e => {
                     const date = e.createdAt ? e.createdAt.toLocaleDateString('pt-BR') : "";
-                    const obs = (e.observations || "").replace(/"/g, '""').replace(/\n/g, ' '); // Limpa quebras de linha nas observações
-                    return [
-                        `"${date}"`,
-                        `"${e.team || ''}"`,
-                        `"${e.requesterName || ''}"`,
-                        `"${e.doctorName || ''}"`,
-                        `"${e.crm || ''}"`,
-                        `"${e.category || ''}"`,
-                        `"${e.actionType || ''}"`,
-                        `"${e.value || ''}"`,
-                        `"${obs}"`
-                    ].join(";");
+                    const obs = (e.observations || "").replace(/"/g, '""').replace(/\n/g, ' '); 
+                    return [`"${date}"`,`"${e.team || ''}"`,`"${e.requesterName || ''}"`,`"${e.doctorName || ''}"`,`"${e.crm || ''}"`,`"${e.category || ''}"`,`"${e.actionType || ''}"`,`"${e.value || ''}"`,`"${obs}"`].join(";");
                 });
 
                 const csvString = [headers.join(";"), ...rows].join("\n");
-                // Adicionamos \uFEFF para forçar o Excel a reconhecer os acentos (UTF-8)
                 const blob = new Blob(["\uFEFF" + csvString], { type: 'text/csv;charset=utf-8;' });
                 const url = URL.createObjectURL(blob);
-                
                 const link = document.createElement("a");
                 link.setAttribute("href", url);
                 link.setAttribute("download", `PF_Relatorio_${new Date().toISOString().split('T')[0]}.csv`);
@@ -284,13 +264,10 @@
                 link.click();
                 document.body.removeChild(link);
                 URL.revokeObjectURL(url);
-                
-                notify("Exportação concluída com sucesso!");
+                notify("Exportação concluída!");
             };
 
-            // =========================================================================
-            // RANKINGS PARA A ABA FEED (AGRUPAMENTOS)
-            // =========================================================================
+            // Rankings
             const feedStatsByRep = useMemo(() => {
                 const groups = feedEntries.reduce((acc, curr) => {
                     const name = curr.requesterName || "NÃO IDENTIFICADO";
@@ -317,15 +294,9 @@
                 const groups = feedEntries.reduce((acc, curr) => {
                     const crmKey = (curr.crm || "").trim().toUpperCase();
                     const groupKey = crmKey || (curr.doctorName || "DESCONHECIDO").trim().toUpperCase();
-                    
                     if (!acc[groupKey]) {
                         acc[groupKey] = { 
-                            total: 0, 
-                            count: 0, 
-                            doctorName: curr.doctorName || "DESCONHECIDO", 
-                            category: curr.category || "-",
-                            crm: crmKey || "-",
-                            createdAt: curr.createdAt?.getTime() || 0
+                            total: 0, count: 0, doctorName: curr.doctorName || "DESCONHECIDO", category: curr.category || "-", crm: crmKey || "-", createdAt: curr.createdAt?.getTime() || 0
                         };
                     } else {
                         const currTime = curr.createdAt?.getTime() || 0;
@@ -342,9 +313,6 @@
                 return Object.values(groups).sort((a, b) => b.total - a.total);
             }, [feedEntries, parseCurrency]);
 
-            // =========================================================================
-            // ESTATÍSTICAS DO ADMIN
-            // =========================================================================
             const countEntriesAdmin = filteredEntriesAdmin.length;
             const totalInvestedAdmin = useMemo(() => filteredEntriesAdmin.reduce((acc, curr) => acc + parseCurrency(curr.value), 0), [filteredEntriesAdmin, parseCurrency]);
 
@@ -391,6 +359,19 @@
                 return (Number(v) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
             };
 
+            const isAllTeams = currentAdmin && currentAdmin.isGeneral && adminGeneralFilter === 'ALL';
+            const hasNoTeam = !currentAdmin && !formData.team;
+            const inputDisabled = isAllTeams || hasNoTeam;
+
+            const getFeedTitle = () => {
+                if (currentAdmin) {
+                    if (currentAdmin.isGeneral && adminGeneralFilter === 'ALL') return "Total Brasil (Geral)";
+                    if (currentAdmin.isGeneral && adminGeneralFilter !== 'MINE') return `Total ${adminGeneralFilter}`;
+                    return `Total Equipe (${currentAdmin.team})`;
+                }
+                return formData.team ? `Seu Total (${formData.team})` : "Seu Total Utilizado";
+            };
+
             return (
                 <div className="min-h-screen bg-slate-100 pb-24 text-slate-900 font-sans">
                     
@@ -419,12 +400,7 @@
                                     <p className="text-[10px] text-emerald-400 font-bold tracking-[0.3em] uppercase mt-1">Corporate Brasil</p>
                                 </div>
                             </div>
-                            {/* BOTÃO EXPORTAR EXCEL */}
-                            <i 
-                                className="ph-bold ph-file-csv text-emerald-400 text-2xl active:scale-90 transition-all cursor-pointer hover:text-emerald-300"
-                                onClick={exportToCSV}
-                                title="Exportar para Excel"
-                            ></i>
+                            <i className="ph-bold ph-file-csv text-emerald-400 text-2xl active:scale-90 transition-all cursor-pointer hover:text-emerald-300" onClick={exportToCSV} title="Exportar para Excel"></i>
                         </div>
                     </header>
 
@@ -515,13 +491,26 @@
                         {view === 'history' && (
                             <div className="space-y-5 animate-in slide-in-from-bottom-4 duration-500 pb-10">
                                 
-                                {/* PAINEL FINANCEIRO */}
+                                {/* Filtro visível no Feed para Admins */}
+                                {currentAdmin && currentAdmin.isGeneral && (
+                                    <select 
+                                        value={adminGeneralFilter} 
+                                        onChange={e => setAdminGeneralFilter(e.target.value)} 
+                                        className="w-full p-3.5 bg-slate-900 text-white rounded-2xl font-bold text-xs outline-none shadow-xl active:scale-[0.98] transition-all uppercase tracking-widest"
+                                    >
+                                        <option value="ALL">🌎 VISÃO GERAL BRASIL (SOMA)</option>
+                                        <option value="MINE">👤 MINHA EQUIPE ({currentAdmin.team})</option>
+                                        {TEAMS.map(t => <option key={t} value={t}>📍 {t}</option>)}
+                                    </select>
+                                )}
+
+                                {/* PAINEL FINANCEIRO DE CONTROLO DE VERBA */}
                                 <div className="bg-slate-900 rounded-[2rem] p-6 shadow-2xl text-white space-y-5 border border-slate-800 relative overflow-hidden">
                                     <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 rounded-full blur-3xl"></div>
                                     <div className="flex justify-between items-center border-b border-slate-800 pb-4 relative z-10">
                                         <div>
                                             <p className="text-[10px] font-black text-emerald-400 uppercase tracking-[0.2em] mb-1">
-                                                {currentAdmin ? "Utilizado na Equipe" : "Seu Total Utilizado"}
+                                                {getFeedTitle()}
                                             </p>
                                             <h4 className="text-2xl font-black tracking-tight">R$ {totalUsedFeed.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h4>
                                         </div>
@@ -532,12 +521,15 @@
                                     </div>
                                     <div className="grid grid-cols-2 gap-5 relative z-10">
                                         <div className="space-y-1.5">
-                                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Teto de Verba</label>
+                                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                                                {isAllTeams ? "Teto do Brasil" : "Teto da Distrital"}
+                                            </label>
                                             <input 
-                                                value={budgetCeiling} 
-                                                onChange={e => setBudgetCeiling(formatValueInput(e.target.value))} 
-                                                placeholder="R$ 0,00" 
-                                                className="w-full bg-slate-800/80 border border-slate-700 rounded-xl p-3 text-sm font-black text-emerald-100 focus:ring-2 focus:ring-emerald-500 uppercase text-center transition-all" 
+                                                value={displayBudgetCeiling} 
+                                                onChange={e => handleBudgetChange(formatValueInput(e.target.value))} 
+                                                placeholder={isAllTeams ? "SOMA AUTOMÁTICA" : "R$ 0,00"} 
+                                                disabled={inputDisabled}
+                                                className={`w-full bg-slate-800/80 border border-slate-700 rounded-xl p-3 text-sm font-black text-emerald-100 focus:ring-2 focus:ring-emerald-500 uppercase text-center transition-all ${inputDisabled ? 'opacity-60 cursor-not-allowed' : ''}`} 
                                             />
                                         </div>
                                         <div className="text-right flex flex-col justify-end">
@@ -605,10 +597,9 @@
                                     </div>
                                 </div>
 
-                                {/* LISTA DETALHADA DE LANÇAMENTOS */}
                                 <div className="flex justify-between items-center px-3 mt-8">
                                     <h2 className="text-xs font-black text-slate-400 uppercase tracking-widest border-l-4 border-emerald-500 pl-2">
-                                        {currentAdmin ? `Atividades Detalhadas` : "Seus Lançamentos"}
+                                        Lista de Atividades
                                     </h2>
                                 </div>
                                 
@@ -647,7 +638,7 @@
                                         <div className="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner"><i className="ph-fill ph-shield-check text-5xl"></i></div>
                                         <h2 className="text-2xl font-black text-slate-800 mb-2 tracking-tight uppercase">Portal do Gestor</h2>
                                         <p className="text-xs text-slate-400 font-bold mt-2">Área restrita à liderança.</p>
-                                        <form onSubmit={e => { e.preventDefault(); if (ADMIN_USERS[pinInput]) { setCurrentAdmin(ADMIN_USERS[pinInput]); setPinInput(''); } else { alert("PIN INCORRETO"); } }} className="space-y-6 mt-8">
+                                        <form onSubmit={handleAdminLogin} className="space-y-6 mt-8">
                                             
                                             {/* CAMPO DE PIN AJUSTADO (SÓ "PIN") */}
                                             <input type="password" value={pinInput} onChange={e => setPinInput(e.target.value)} placeholder="PIN" className="w-full p-5 bg-slate-100 rounded-2xl text-center text-4xl font-black tracking-[0.5em] outline-none border-2 border-transparent focus:border-emerald-500 uppercase shadow-inner transition-all" maxLength={6} />
@@ -688,7 +679,7 @@
                                                 {/* RANKING: TOTAL POR DISTRITAL (EXCLUSIVO ADMIN GERAL) */}
                                                 {currentAdmin.isGeneral && (
                                                     <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100">
-                                                        <h3 className="text-[10px] font-black text-slate-800 uppercase tracking-[0.2em] mb-6 flex items-center gap-2"><i className="ph-bold ph-map-pin text-emerald-500 text-lg"></i> Total por Distrital / Equipe</h3>
+                                                        <h3 className="text-[10px] font-black text-slate-800 uppercase tracking-[0.2em] mb-6 flex items-center gap-2"><i className="ph-bold ph-map-pin text-emerald-500 text-lg"></i> Total por Distrital</h3>
                                                         <div className="space-y-4 max-h-64 overflow-y-auto pr-2">
                                                             {statsByTeam.map((s, i) => (
                                                                 <div key={i} className="space-y-2 animate-in slide-in-from-left-2 duration-300 border-b border-slate-50 pb-2 last:border-0">
