@@ -195,19 +195,33 @@
                 return onAuthStateChanged(auth, setUser);
             }, [notify]);
 
+            // =========================================================================
+            // LEITURA DE DADOS SEGURA (BLINDADA CONTRA ERROS DE ESTRUTURA)
+            // =========================================================================
             useEffect(() => {
                 if (!user) return;
                 setLoading(true);
                 const colRef = collection(db, COLLECTION_NAME);
                 const unsubscribe = onSnapshot(colRef, (snapshot) => {
-                    const data = snapshot.docs.map(doc => {
-                        const d = doc.data();
-                        let date = new Date();
-                        if (d.createdAt) date = d.createdAt.toDate ? d.createdAt.toDate() : new Date(d.createdAt);
-                        return { id: doc.id, ...d, createdAt: date };
-                    });
-                    setEntries([...data].sort((a, b) => b.createdAt - a.createdAt));
-                    setLoading(false);
+                    try {
+                        const data = snapshot.docs.map(doc => {
+                            const d = doc.data();
+                            let date = new Date();
+                            if (d.createdAt) {
+                                if (typeof d.createdAt.toDate === 'function') {
+                                    date = d.createdAt.toDate();
+                                } else {
+                                    date = new Date(d.createdAt);
+                                }
+                            }
+                            return { id: doc.id, ...d, createdAt: date };
+                        });
+                        setEntries([...data].sort((a, b) => b.createdAt - a.createdAt));
+                        setLoading(false);
+                    } catch (error) {
+                        console.error("Erro na leitura de dados:", error);
+                        setLoading(false);
+                    }
                 });
                 return () => unsubscribe();
             }, [user]);
@@ -218,25 +232,33 @@
             }, []);
 
             // =========================================================================
-            // FILTRO DE PRIVACIDADE DO FEED E CÁLCULOS
+            // FILTRO DE PRIVACIDADE DO FEED E CÁLCULOS (BLINDADOS)
             // =========================================================================
             const filteredEntriesAdmin = useMemo(() => {
-                if (!currentAdmin) return [];
-                if (currentAdmin.isGeneral) {
-                    if (adminGeneralFilter === 'MINE') return entries.filter(e => e.team === currentAdmin.team);
-                    if (adminGeneralFilter !== 'ALL') return entries.filter(e => e.team === adminGeneralFilter);
-                    return entries;
-                }
-                return entries.filter(e => e.team === currentAdmin.team);
+                try {
+                    if (!currentAdmin) return [];
+                    if (currentAdmin.isGeneral) {
+                        if (adminGeneralFilter === 'MINE') return entries.filter(e => e.team === currentAdmin.team);
+                        if (adminGeneralFilter !== 'ALL') return entries.filter(e => e.team === adminGeneralFilter);
+                        return entries;
+                    }
+                    return entries.filter(e => e.team === currentAdmin.team);
+                } catch (e) { return []; }
             }, [entries, currentAdmin, adminGeneralFilter]);
 
             const feedEntries = useMemo(() => {
-                if (currentAdmin) return filteredEntriesAdmin; 
-                if (formData.requesterName) return entries.filter(e => e.requesterName === formData.requesterName);
-                return []; 
+                try {
+                    if (currentAdmin) return filteredEntriesAdmin; 
+                    if (formData.requesterName) return entries.filter(e => e.requesterName === formData.requesterName);
+                    return []; 
+                } catch (e) { return []; }
             }, [entries, currentAdmin, filteredEntriesAdmin, formData.requesterName]);
 
-            const totalUsedFeed = useMemo(() => feedEntries.reduce((acc, curr) => acc + parseCurrency(curr.value), 0), [feedEntries, parseCurrency]);
+            const totalUsedFeed = useMemo(() => {
+                try {
+                    return feedEntries.reduce((acc, curr) => acc + parseCurrency(curr.value), 0);
+                } catch(e) { return 0; }
+            }, [feedEntries, parseCurrency]);
             
             const budgetBalance = useMemo(() => {
                 const ceiling = parseFloat(String(budgetCeiling).replace(/\./g, '').replace(',', '.')) || 0;
@@ -244,87 +266,118 @@
             }, [budgetCeiling, totalUsedFeed]);
 
             const exportToCSV = () => {
-                const dataToExport = currentAdmin ? filteredEntriesAdmin : feedEntries;
-                if (dataToExport.length === 0) return notify("Não existem dados para exportar.", "error");
+                try {
+                    const dataToExport = currentAdmin ? filteredEntriesAdmin : feedEntries;
+                    if (dataToExport.length === 0) return notify("Não existem dados para exportar.", "error");
 
-                const headers = ["Data", "Estrutura", "Solicitante", "Medico/Destinatario", "CRM", "Categoria", "Acao", "Valor", "Observacoes"];
-                const rows = dataToExport.map(e => {
-                    const date = e.createdAt ? e.createdAt.toLocaleDateString('pt-BR') : "";
-                    const obs = (e.observations || "").replace(/"/g, '""').replace(/\n/g, ' '); 
-                    return [`"${date}"`,`"${e.team || ''}"`,`"${e.requesterName || ''}"`,`"${e.doctorName || ''}"`,`"${e.crm || ''}"`,`"${e.category || ''}"`,`"${e.actionType || ''}"`,`"${e.value || ''}"`,`"${obs}"`].join(";");
-                });
+                    const headers = ["Data", "Estrutura", "Solicitante", "Medico/Destinatario", "CRM", "Categoria", "Acao", "Valor", "Observacoes"];
+                    const rows = dataToExport.map(e => {
+                        const date = (e.createdAt && e.createdAt.toLocaleDateString) ? e.createdAt.toLocaleDateString('pt-BR') : "";
+                        const obs = String(e.observations || "").replace(/"/g, '""').replace(/\n/g, ' '); 
+                        return [`"${date}"`,`"${e.team || ''}"`,`"${e.requesterName || ''}"`,`"${e.doctorName || ''}"`,`"${e.crm || ''}"`,`"${e.category || ''}"`,`"${e.actionType || ''}"`,`"${e.value || ''}"`,`"${obs}"`].join(";");
+                    });
 
-                const csvString = [headers.join(";"), ...rows].join("\n");
-                const blob = new Blob(["\uFEFF" + csvString], { type: 'text/csv;charset=utf-8;' });
-                const url = URL.createObjectURL(blob);
-                const link = document.createElement("a");
-                link.setAttribute("href", url);
-                link.setAttribute("download", `PF_Relatorio_${new Date().toISOString().split('T')[0]}.csv`);
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                URL.revokeObjectURL(url);
-                notify("Exportação concluída!");
+                    const csvString = [headers.join(";"), ...rows].join("\n");
+                    const blob = new Blob(["\uFEFF" + csvString], { type: 'text/csv;charset=utf-8;' });
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement("a");
+                    link.setAttribute("href", url);
+                    link.setAttribute("download", `PF_Relatorio_${new Date().toISOString().split('T')[0]}.csv`);
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    URL.revokeObjectURL(url);
+                    notify("Exportação concluída!");
+                } catch (err) {
+                    console.error("Erro na exportação", err);
+                    notify("Falha ao exportar", "error");
+                }
             };
 
-            // Rankings
+            // =========================================================================
+            // RANKINGS PARA A ABA FEED (AGRUPAMENTOS BLINDADOS)
+            // =========================================================================
             const feedStatsByRep = useMemo(() => {
-                const groups = feedEntries.reduce((acc, curr) => {
-                    const name = curr.requesterName || "NÃO IDENTIFICADO";
-                    if (!acc[name]) acc[name] = { total: 0, count: 0 };
-                    acc[name].total += parseCurrency(curr.value);
-                    acc[name].count += 1;
-                    return acc;
-                }, {});
-                return Object.entries(groups).map(([name, data]) => ({ name, ...data })).sort((a, b) => b.total - a.total);
+                try {
+                    const groups = feedEntries.reduce((acc, curr) => {
+                        const name = String(curr.requesterName || "NÃO IDENTIFICADO");
+                        if (!acc[name]) acc[name] = { total: 0, count: 0 };
+                        acc[name].total += parseCurrency(curr.value);
+                        acc[name].count += 1;
+                        return acc;
+                    }, {});
+                    return Object.entries(groups).map(([name, data]) => ({ name, ...data })).sort((a, b) => b.total - a.total);
+                } catch(e) { return []; }
             }, [feedEntries, parseCurrency]);
 
             const feedStatsByAction = useMemo(() => {
-                const groups = feedEntries.reduce((acc, curr) => {
-                    const type = curr.actionType || "NÃO DEFINIDA";
-                    if (!acc[type]) acc[type] = { total: 0, count: 0 };
-                    acc[type].total += parseCurrency(curr.value);
-                    acc[type].count += 1;
-                    return acc;
-                }, {});
-                return Object.entries(groups).map(([name, data]) => ({ name, ...data })).sort((a, b) => b.total - a.total);
+                try {
+                    const groups = feedEntries.reduce((acc, curr) => {
+                        const type = String(curr.actionType || "NÃO DEFINIDA");
+                        if (!acc[type]) acc[type] = { total: 0, count: 0 };
+                        acc[type].total += parseCurrency(curr.value);
+                        acc[type].count += 1;
+                        return acc;
+                    }, {});
+                    return Object.entries(groups).map(([name, data]) => ({ name, ...data })).sort((a, b) => b.total - a.total);
+                } catch(e) { return []; }
             }, [feedEntries, parseCurrency]);
 
             const feedStatsByDoctor = useMemo(() => {
-                const groups = feedEntries.reduce((acc, curr) => {
-                    const crmKey = (curr.crm || "").trim().toUpperCase();
-                    const groupKey = crmKey || (curr.doctorName || "DESCONHECIDO").trim().toUpperCase();
-                    if (!acc[groupKey]) {
-                        acc[groupKey] = { 
-                            total: 0, count: 0, doctorName: curr.doctorName || "DESCONHECIDO", category: curr.category || "-", crm: crmKey || "-", createdAt: curr.createdAt?.getTime() || 0
-                        };
-                    } else {
-                        const currTime = curr.createdAt?.getTime() || 0;
-                        if (currTime < acc[groupKey].createdAt) {
-                            acc[groupKey].doctorName = curr.doctorName || "DESCONHECIDO";
-                            acc[groupKey].category = curr.category || "-";
-                            acc[groupKey].createdAt = currTime;
+                try {
+                    const groups = feedEntries.reduce((acc, curr) => {
+                        const crmKey = String(curr.crm || "").trim().toUpperCase();
+                        const groupKey = crmKey || String(curr.doctorName || "DESCONHECIDO").trim().toUpperCase();
+                        
+                        if (!acc[groupKey]) {
+                            acc[groupKey] = { 
+                                total: 0, 
+                                count: 0, 
+                                doctorName: String(curr.doctorName || "DESCONHECIDO"), 
+                                category: String(curr.category || "-"), 
+                                crm: crmKey || "-", 
+                                createdAt: (curr.createdAt && curr.createdAt.getTime) ? curr.createdAt.getTime() : 0
+                            };
+                        } else {
+                            const currTime = (curr.createdAt && curr.createdAt.getTime) ? curr.createdAt.getTime() : 0;
+                            if (currTime < acc[groupKey].createdAt) {
+                                acc[groupKey].doctorName = String(curr.doctorName || "DESCONHECIDO");
+                                acc[groupKey].category = String(curr.category || "-");
+                                acc[groupKey].createdAt = currTime;
+                            }
                         }
-                    }
-                    acc[groupKey].total += parseCurrency(curr.value);
-                    acc[groupKey].count += 1;
-                    return acc;
-                }, {});
-                return Object.values(groups).sort((a, b) => b.total - a.total);
+                        acc[groupKey].total += parseCurrency(curr.value);
+                        acc[groupKey].count += 1;
+                        return acc;
+                    }, {});
+                    return Object.values(groups).sort((a, b) => b.total - a.total);
+                } catch(e) { 
+                    console.error("Erro no processamento médico", e);
+                    return []; 
+                }
             }, [feedEntries, parseCurrency]);
 
+            // =========================================================================
+            // ESTATÍSTICAS DO ADMIN (BLINDADO)
+            // =========================================================================
             const countEntriesAdmin = filteredEntriesAdmin.length;
-            const totalInvestedAdmin = useMemo(() => filteredEntriesAdmin.reduce((acc, curr) => acc + parseCurrency(curr.value), 0), [filteredEntriesAdmin, parseCurrency]);
+            const totalInvestedAdmin = useMemo(() => {
+                try {
+                    return filteredEntriesAdmin.reduce((acc, curr) => acc + parseCurrency(curr.value), 0);
+                } catch(e) { return 0; }
+            }, [filteredEntriesAdmin, parseCurrency]);
 
             const statsByTeam = useMemo(() => {
-                const groups = filteredEntriesAdmin.reduce((acc, curr) => {
-                    const team = curr.team || "SEM ESTRUTURA";
-                    if (!acc[team]) acc[team] = { total: 0, count: 0 };
-                    acc[team].total += parseCurrency(curr.value);
-                    acc[team].count += 1;
-                    return acc;
-                }, {});
-                return Object.entries(groups).map(([name, data]) => ({ name, ...data })).sort((a, b) => b.total - a.total);
+                try {
+                    const groups = filteredEntriesAdmin.reduce((acc, curr) => {
+                        const team = String(curr.team || "SEM ESTRUTURA");
+                        if (!acc[team]) acc[team] = { total: 0, count: 0 };
+                        acc[team].total += parseCurrency(curr.value);
+                        acc[team].count += 1;
+                        return acc;
+                    }, {});
+                    return Object.entries(groups).map(([name, data]) => ({ name, ...data })).sort((a, b) => b.total - a.total);
+                } catch(e) { return []; }
             }, [filteredEntriesAdmin, parseCurrency]);
 
             const handleSubmit = async (e) => {
@@ -355,7 +408,7 @@
             const currentReps = REPRESENTATIVES[formData.team] || [];
 
             const formatValueInput = (val) => {
-                let v = val.replace(/\D/g, "");
+                let v = String(val).replace(/\D/g, "");
                 return (Number(v) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
             };
 
@@ -616,13 +669,15 @@
                                     feedEntries.map(e => (
                                         <div key={e.id} className="bg-white p-5 rounded-2xl shadow-md border border-slate-100 flex justify-between items-start active:scale-[0.98] transition-all">
                                             <div className="min-w-0 pr-4 text-left">
-                                                <span className="text-[9px] font-black text-emerald-600 uppercase bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-100">{e.team}</span>
-                                                <h3 className="font-bold text-slate-800 text-sm truncate mt-2 uppercase leading-tight">{e.doctorName}</h3>
-                                                <p className="text-[11px] text-slate-500 font-bold uppercase truncate opacity-70 mt-0.5">{e.requesterName} • {e.actionType}</p>
+                                                <span className="text-[9px] font-black text-emerald-600 uppercase bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-100">{String(e.team || 'S/ Equipa')}</span>
+                                                <h3 className="font-bold text-slate-800 text-sm truncate mt-2 uppercase leading-tight">{String(e.doctorName || '')}</h3>
+                                                <p className="text-[11px] text-slate-500 font-bold uppercase truncate opacity-70 mt-0.5">{String(e.requesterName || '')} • {String(e.actionType || '')}</p>
                                             </div>
                                             <div className="text-right shrink-0">
-                                                <p className="font-black text-slate-900 text-sm uppercase tracking-tighter">R$ {e.value}</p>
-                                                <p className="text-[10px] text-slate-400 font-bold mt-1">{e.createdAt.toLocaleDateString()}</p>
+                                                <p className="font-black text-slate-900 text-sm uppercase tracking-tighter">R$ {String(e.value || '0,00')}</p>
+                                                <p className="text-[10px] text-slate-400 font-bold mt-1">
+                                                    {(e.createdAt && e.createdAt.toLocaleDateString) ? e.createdAt.toLocaleDateString('pt-BR') : ''}
+                                                </p>
                                             </div>
                                         </div>
                                     ))
@@ -639,10 +694,7 @@
                                         <h2 className="text-2xl font-black text-slate-800 mb-2 tracking-tight uppercase">Portal do Gestor</h2>
                                         <p className="text-xs text-slate-400 font-bold mt-2">Área restrita à liderança.</p>
                                         <form onSubmit={handleAdminLogin} className="space-y-6 mt-8">
-                                            
-                                            {/* CAMPO DE PIN AJUSTADO (SÓ "PIN") */}
                                             <input type="password" value={pinInput} onChange={e => setPinInput(e.target.value)} placeholder="PIN" className="w-full p-5 bg-slate-100 rounded-2xl text-center text-4xl font-black tracking-[0.5em] outline-none border-2 border-transparent focus:border-emerald-500 uppercase shadow-inner transition-all" maxLength={6} />
-                                            
                                             <button type="submit" className="w-full bg-slate-900 text-white font-black py-5 rounded-2xl shadow-xl uppercase text-sm tracking-widest active:scale-95 transition-all">Acessar Painel</button>
                                         </form>
                                     </div>
@@ -701,9 +753,9 @@
                                                 {filteredEntriesAdmin.map(e => (
                                                     <div key={e.id} className="bg-white p-5 rounded-2xl shadow-md border border-slate-100 flex justify-between items-center active:scale-[0.98] transition-all">
                                                         <div className="min-w-0 pr-4 text-left">
-                                                            <p className="text-[10px] font-black text-rose-500 uppercase italic tracking-wider mb-1">{e.team}</p>
-                                                            <h3 className="font-bold text-slate-800 text-sm truncate uppercase leading-tight">{e.doctorName}</h3>
-                                                            <p className="text-[11px] text-slate-500 font-bold uppercase truncate opacity-70 mt-0.5">R$ {e.value} • {e.requesterName}</p>
+                                                            <p className="text-[10px] font-black text-rose-500 uppercase italic tracking-wider mb-1">{String(e.team || '')}</p>
+                                                            <h3 className="font-bold text-slate-800 text-sm truncate uppercase leading-tight">{String(e.doctorName || '')}</h3>
+                                                            <p className="text-[11px] text-slate-500 font-bold uppercase truncate opacity-70 mt-0.5">R$ {String(e.value || '0,00')} • {String(e.requesterName || '')}</p>
                                                         </div>
                                                         <button onClick={() => setDeleteTarget(e)} className="w-12 h-12 bg-rose-50 text-rose-600 rounded-2xl flex items-center justify-center shadow-sm active:scale-90 border border-rose-100 transition-all"><i className="ph-bold ph-trash text-xl"></i></button>
                                                     </div>
