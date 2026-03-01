@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <!-- TITULO CURTO FORÇADO PARA O iPHONE LER CORRETAMENTE -->
+    <!-- Título Curto Forçado para o ícone do iPhone -->
     <title>PF Verbas</title>
     
     <!-- Configuração PWA (Aplicações Web Progressivas) -->
@@ -13,7 +13,7 @@
     <meta name="application-name" content="PF Verbas">
     <meta name="theme-color" content="#0f172a">
 
-    <!-- Bibliotecas e Estilo -->
+    <!-- Bibliotecas e Estilos -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -30,7 +30,7 @@
         import { getFirestore, collection, addDoc, onSnapshot, doc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // =============================================================
-        // CONFIGURAÇÃO DO BANCO DE DADOS (FIREBASE GOOGLE)
+        // CONFIGURAÇÃO DO BANCO DE DADOS (FIREBASE)
         // =============================================================
         const firebaseConfig = {
             apiKey: "AIzaSyBSXiZWea-cXvztxKv28YggNOJioqsBobU",
@@ -120,7 +120,6 @@
         ];
         const CATEGORIES = ['CAT 1', 'CAT 2', 'CAT 3', 'CAT 4'];
         
-        // PINS DE GESTORES PREPARADOS PARA CADA ESTRUTURA
         const ADMIN_USERS = {
             "8888": { name: "CARLOS OTÁVIO", isGeneral: true, team: "DIRETORIA (MATRIZ)" },
             "1001": { name: "GESTOR RIO", isGeneral: false, team: "DISTRITAL RIO TOTAL" },
@@ -145,59 +144,94 @@
             const [adminGeneralFilter, setAdminGeneralFilter] = useState('ALL');
             const [deleteTarget, setDeleteTarget] = useState(null);
 
-            // Recupera a memória do teto de verba do dispositivo
-            const [budgetCeiling, setBudgetCeilingState] = useState(localStorage.getItem('pf_budget_ceiling') || '');
-            
-            const setBudgetCeiling = (val) => {
-                setBudgetCeilingState(val);
-                localStorage.setItem('pf_budget_ceiling', val); // Salva na memória
-            };
-
-            // Recupera quem é o utilizador (Estrutura e Nome) para o filtro do Feed
-            const [formData, setFormData] = useState({
-                team: localStorage.getItem('pf_user_team') || '', 
-                requesterName: localStorage.getItem('pf_user_name') || '', 
-                doctorName: '', crm: '', category: '', actionType: '', value: '', observations: ''
+            // =========================================================================
+            // GESTÃO SEGURA DE MEMÓRIA (BLINDADA CONTRA ERROS DE LOCALSTORAGE NO IOS)
+            // =========================================================================
+            const [teamBudgets, setTeamBudgets] = useState(() => {
+                try { return JSON.parse(localStorage.getItem('pf_team_budgets')) || {}; } 
+                catch (e) { return {}; }
             });
 
-            // Guarda sempre que o representante mudar o próprio nome ou equipa
+            const handleBudgetChange = (val) => {
+                if (!currentFeedTeam || currentFeedTeam === 'ALL') return;
+                const newBudgets = { ...teamBudgets, [currentFeedTeam]: val };
+                setTeamBudgets(newBudgets);
+                try { localStorage.setItem('pf_team_budgets', JSON.stringify(newBudgets)); } catch(e) {}
+            };
+
+            const [formData, setFormData] = useState(() => {
+                let t = '', r = '';
+                try {
+                    t = localStorage.getItem('pf_user_team') || '';
+                    r = localStorage.getItem('pf_user_name') || '';
+                } catch(e) {}
+                return {
+                    team: t, requesterName: r, doctorName: '', crm: '', category: '', actionType: '', value: '', observations: ''
+                };
+            });
+
             useEffect(() => {
-                localStorage.setItem('pf_user_team', formData.team);
-                localStorage.setItem('pf_user_name', formData.requesterName);
+                try {
+                    localStorage.setItem('pf_user_team', formData.team);
+                    localStorage.setItem('pf_user_name', formData.requesterName);
+                } catch (e) {}
             }, [formData.team, formData.requesterName]);
 
-            // Geração de Ícone da App
-            useEffect(() => {
-                const canvas = document.createElement('canvas');
-                canvas.width = 1024; canvas.height = 1024;
-                const ctx = canvas.getContext('2d');
-                if (ctx) {
-                    const grad = ctx.createLinearGradient(0, 0, 1024, 1024);
-                    grad.addColorStop(0, '#059669'); grad.addColorStop(1, '#10b981');
-                    ctx.fillStyle = grad;
-                    ctx.beginPath(); ctx.roundRect(0, 0, 1024, 1024, 200); ctx.fill();
-                    ctx.fillStyle = 'white'; ctx.font = 'italic bold 550px serif';
-                    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-                    ctx.fillText('PF', 512, 512 + 40);
-                    const iconUrl = canvas.toDataURL('image/png');
-                    let link = document.querySelector('link[rel="apple-touch-icon"]') || document.createElement('link');
-                    link.rel = 'apple-touch-icon'; link.href = iconUrl; document.head.appendChild(link);
-                }
-            }, []);
-
+            // =========================================================================
+            // FUNÇÕES AUXILIARES SEGURAS
+            // =========================================================================
             const notify = useCallback((msg, type = 'success') => {
                 setStatus({ type, msg });
                 setTimeout(() => setStatus({ type: '', msg: '' }), 4000);
             }, []);
 
+            const parseCurrency = useCallback((valStr) => {
+                if (!valStr) return 0;
+                return parseFloat(String(valStr).replace(/\./g, '').replace(',', '.')) || 0;
+            }, []);
+
+            const formatDate = (dateObj) => {
+                try {
+                    if (dateObj && typeof dateObj.toLocaleDateString === 'function') {
+                        return dateObj.toLocaleDateString('pt-BR');
+                    }
+                    return '';
+                } catch (e) { return ''; }
+            };
+
+            const formatValueInput = (val) => {
+                let v = String(val || "").replace(/\D/g, "");
+                return (Number(v) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            };
+
+            // Ícone Dinâmico
+            useEffect(() => {
+                try {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = 1024; canvas.height = 1024;
+                    const ctx = canvas.getContext('2d');
+                    if (ctx) {
+                        const grad = ctx.createLinearGradient(0, 0, 1024, 1024);
+                        grad.addColorStop(0, '#059669'); grad.addColorStop(1, '#10b981');
+                        ctx.fillStyle = grad;
+                        ctx.beginPath(); ctx.roundRect(0, 0, 1024, 1024, 200); ctx.fill();
+                        ctx.fillStyle = 'white'; ctx.font = 'italic bold 550px serif';
+                        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                        ctx.fillText('PF', 512, 512 + 40);
+                        const iconUrl = canvas.toDataURL('image/png');
+                        let link = document.querySelector('link[rel="apple-touch-icon"]') || document.createElement('link');
+                        link.rel = 'apple-touch-icon'; link.href = iconUrl; document.head.appendChild(link);
+                    }
+                } catch(e) {}
+            }, []);
+
+            // Firebase Login
             useEffect(() => {
                 signInAnonymously(auth).catch(() => notify("Erro de ligação", "error"));
                 return onAuthStateChanged(auth, setUser);
             }, [notify]);
 
-            // =========================================================================
-            // LEITURA DE DADOS SEGURA (BLINDADA CONTRA ERROS DE ESTRUTURA)
-            // =========================================================================
+            // Firebase Data Fetch
             useEffect(() => {
                 if (!user) return;
                 setLoading(true);
@@ -218,22 +252,39 @@
                         });
                         setEntries([...data].sort((a, b) => b.createdAt - a.createdAt));
                         setLoading(false);
-                    } catch (error) {
-                        console.error("Erro na leitura de dados:", error);
+                    } catch (e) {
+                        console.error(e);
                         setLoading(false);
                     }
                 });
                 return () => unsubscribe();
             }, [user]);
 
-            const parseCurrency = useCallback((valStr) => {
-                if (!valStr) return 0;
-                return parseFloat(String(valStr).replace(/\./g, '').replace(',', '.')) || 0;
-            }, []);
+            // =========================================================================
+            // CÁLCULOS E FILTROS (BLINDADOS)
+            // =========================================================================
+            const currentFeedTeam = useMemo(() => {
+                if (currentAdmin) {
+                    if (currentAdmin.isGeneral) {
+                        if (adminGeneralFilter === 'ALL') return 'ALL';
+                        if (adminGeneralFilter === 'MINE') return currentAdmin.team;
+                        return adminGeneralFilter;
+                    }
+                    return currentAdmin.team;
+                }
+                return formData.team; 
+            }, [currentAdmin, adminGeneralFilter, formData.team]);
 
-            // =========================================================================
-            // FILTRO DE PRIVACIDADE DO FEED E CÁLCULOS (BLINDADOS)
-            // =========================================================================
+            const displayBudgetCeiling = useMemo(() => {
+                try {
+                    if (currentFeedTeam === 'ALL') {
+                        const total = TEAMS.reduce((acc, team) => acc + parseCurrency(teamBudgets[team] || "0"), 0);
+                        return total > 0 ? total.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '';
+                    }
+                    return teamBudgets[currentFeedTeam] || '';
+                } catch(e) { return ''; }
+            }, [currentFeedTeam, teamBudgets, parseCurrency]);
+
             const filteredEntriesAdmin = useMemo(() => {
                 try {
                     if (!currentAdmin) return [];
@@ -243,7 +294,7 @@
                         return entries;
                     }
                     return entries.filter(e => e.team === currentAdmin.team);
-                } catch (e) { return []; }
+                } catch(e) { return []; }
             }, [entries, currentAdmin, adminGeneralFilter]);
 
             const feedEntries = useMemo(() => {
@@ -251,52 +302,19 @@
                     if (currentAdmin) return filteredEntriesAdmin; 
                     if (formData.requesterName) return entries.filter(e => e.requesterName === formData.requesterName);
                     return []; 
-                } catch (e) { return []; }
+                } catch(e) { return []; }
             }, [entries, currentAdmin, filteredEntriesAdmin, formData.requesterName]);
 
             const totalUsedFeed = useMemo(() => {
-                try {
-                    return feedEntries.reduce((acc, curr) => acc + parseCurrency(curr.value), 0);
-                } catch(e) { return 0; }
+                try { return feedEntries.reduce((acc, curr) => acc + parseCurrency(curr.value), 0); } 
+                catch(e) { return 0; }
             }, [feedEntries, parseCurrency]);
             
             const budgetBalance = useMemo(() => {
-                const ceiling = parseFloat(String(budgetCeiling).replace(/\./g, '').replace(',', '.')) || 0;
-                return ceiling - totalUsedFeed;
-            }, [budgetCeiling, totalUsedFeed]);
+                try { return parseCurrency(displayBudgetCeiling) - totalUsedFeed; } 
+                catch(e) { return 0; }
+            }, [displayBudgetCeiling, totalUsedFeed]);
 
-            const exportToCSV = () => {
-                try {
-                    const dataToExport = currentAdmin ? filteredEntriesAdmin : feedEntries;
-                    if (dataToExport.length === 0) return notify("Não existem dados para exportar.", "error");
-
-                    const headers = ["Data", "Estrutura", "Solicitante", "Medico/Destinatario", "CRM", "Categoria", "Acao", "Valor", "Observacoes"];
-                    const rows = dataToExport.map(e => {
-                        const date = (e.createdAt && e.createdAt.toLocaleDateString) ? e.createdAt.toLocaleDateString('pt-BR') : "";
-                        const obs = String(e.observations || "").replace(/"/g, '""').replace(/\n/g, ' '); 
-                        return [`"${date}"`,`"${e.team || ''}"`,`"${e.requesterName || ''}"`,`"${e.doctorName || ''}"`,`"${e.crm || ''}"`,`"${e.category || ''}"`,`"${e.actionType || ''}"`,`"${e.value || ''}"`,`"${obs}"`].join(";");
-                    });
-
-                    const csvString = [headers.join(";"), ...rows].join("\n");
-                    const blob = new Blob(["\uFEFF" + csvString], { type: 'text/csv;charset=utf-8;' });
-                    const url = URL.createObjectURL(blob);
-                    const link = document.createElement("a");
-                    link.setAttribute("href", url);
-                    link.setAttribute("download", `PF_Relatorio_${new Date().toISOString().split('T')[0]}.csv`);
-                    document.body.appendChild(link);
-                    link.click();
-                    document.body.removeChild(link);
-                    URL.revokeObjectURL(url);
-                    notify("Exportação concluída!");
-                } catch (err) {
-                    console.error("Erro na exportação", err);
-                    notify("Falha ao exportar", "error");
-                }
-            };
-
-            // =========================================================================
-            // RANKINGS PARA A ABA FEED (AGRUPAMENTOS BLINDADOS)
-            // =========================================================================
             const feedStatsByRep = useMemo(() => {
                 try {
                     const groups = feedEntries.reduce((acc, curr) => {
@@ -328,18 +346,14 @@
                     const groups = feedEntries.reduce((acc, curr) => {
                         const crmKey = String(curr.crm || "").trim().toUpperCase();
                         const groupKey = crmKey || String(curr.doctorName || "DESCONHECIDO").trim().toUpperCase();
-                        
                         if (!acc[groupKey]) {
                             acc[groupKey] = { 
-                                total: 0, 
-                                count: 0, 
-                                doctorName: String(curr.doctorName || "DESCONHECIDO"), 
-                                category: String(curr.category || "-"), 
-                                crm: crmKey || "-", 
-                                createdAt: (curr.createdAt && curr.createdAt.getTime) ? curr.createdAt.getTime() : 0
+                                total: 0, count: 0, doctorName: String(curr.doctorName || "DESCONHECIDO"), 
+                                category: String(curr.category || "-"), crm: crmKey || "-", 
+                                createdAt: (curr.createdAt && typeof curr.createdAt.getTime === 'function') ? curr.createdAt.getTime() : 0
                             };
                         } else {
-                            const currTime = (curr.createdAt && curr.createdAt.getTime) ? curr.createdAt.getTime() : 0;
+                            const currTime = (curr.createdAt && typeof curr.createdAt.getTime === 'function') ? curr.createdAt.getTime() : 0;
                             if (currTime < acc[groupKey].createdAt) {
                                 acc[groupKey].doctorName = String(curr.doctorName || "DESCONHECIDO");
                                 acc[groupKey].category = String(curr.category || "-");
@@ -351,20 +365,13 @@
                         return acc;
                     }, {});
                     return Object.values(groups).sort((a, b) => b.total - a.total);
-                } catch(e) { 
-                    console.error("Erro no processamento médico", e);
-                    return []; 
-                }
+                } catch(e) { return []; }
             }, [feedEntries, parseCurrency]);
 
-            // =========================================================================
-            // ESTATÍSTICAS DO ADMIN (BLINDADO)
-            // =========================================================================
             const countEntriesAdmin = filteredEntriesAdmin.length;
             const totalInvestedAdmin = useMemo(() => {
-                try {
-                    return filteredEntriesAdmin.reduce((acc, curr) => acc + parseCurrency(curr.value), 0);
-                } catch(e) { return 0; }
+                try { return filteredEntriesAdmin.reduce((acc, curr) => acc + parseCurrency(curr.value), 0); } 
+                catch(e) { return 0; }
             }, [filteredEntriesAdmin, parseCurrency]);
 
             const statsByTeam = useMemo(() => {
@@ -380,6 +387,9 @@
                 } catch(e) { return []; }
             }, [filteredEntriesAdmin, parseCurrency]);
 
+            // =========================================================================
+            // AÇÕES E EVENTOS
+            // =========================================================================
             const handleSubmit = async (e) => {
                 e.preventDefault();
                 const { team, requesterName, doctorName, value, observations, crm, category, actionType } = formData;
@@ -404,12 +414,44 @@
                 } catch (err) { alert("Erro ao excluir."); }
             };
 
+            // CORREÇÃO CRÍTICA: FUNÇÃO DE LOGIN DO ADMIN REESTABELECIDA
+            const handleAdminLogin = (e) => {
+                e.preventDefault();
+                if (ADMIN_USERS[pinInput]) {
+                    setCurrentAdmin(ADMIN_USERS[pinInput]);
+                    setPinInput('');
+                } else {
+                    alert("PIN INCORRETO");
+                }
+            };
+
             const logoutAdmin = () => { setCurrentAdmin(null); setPinInput(''); };
             const currentReps = REPRESENTATIVES[formData.team] || [];
 
-            const formatValueInput = (val) => {
-                let v = String(val).replace(/\D/g, "");
-                return (Number(v) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            const exportToCSV = () => {
+                try {
+                    const dataToExport = currentAdmin ? filteredEntriesAdmin : feedEntries;
+                    if (dataToExport.length === 0) return notify("Não existem dados para exportar.", "error");
+
+                    const headers = ["Data", "Estrutura", "Solicitante", "Medico/Destinatario", "CRM", "Categoria", "Acao", "Valor", "Observacoes"];
+                    const rows = dataToExport.map(e => {
+                        const date = formatDate(e.createdAt);
+                        const obs = String(e.observations || "").replace(/"/g, '""').replace(/\n/g, ' '); 
+                        return [`"${date}"`,`"${e.team || ''}"`,`"${e.requesterName || ''}"`,`"${e.doctorName || ''}"`,`"${e.crm || ''}"`,`"${e.category || ''}"`,`"${e.actionType || ''}"`,`"${e.value || ''}"`,`"${obs}"`].join(";");
+                    });
+
+                    const csvString = [headers.join(";"), ...rows].join("\n");
+                    const blob = new Blob(["\uFEFF" + csvString], { type: 'text/csv;charset=utf-8;' });
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement("a");
+                    link.setAttribute("href", url);
+                    link.setAttribute("download", `PF_Relatorio_${new Date().toISOString().split('T')[0]}.csv`);
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    URL.revokeObjectURL(url);
+                    notify("Exportação concluída!");
+                } catch (err) { notify("Falha ao exportar", "error"); }
             };
 
             const isAllTeams = currentAdmin && currentAdmin.isGeneral && adminGeneralFilter === 'ALL';
@@ -565,7 +607,7 @@
                                             <p className="text-[10px] font-black text-emerald-400 uppercase tracking-[0.2em] mb-1">
                                                 {getFeedTitle()}
                                             </p>
-                                            <h4 className="text-2xl font-black tracking-tight">R$ {totalUsedFeed.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h4>
+                                            <h4 className="text-2xl font-black tracking-tight">R$ {Number(totalUsedFeed).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h4>
                                         </div>
                                         <div className="text-right">
                                             <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">Registos</p>
@@ -588,7 +630,7 @@
                                         <div className="text-right flex flex-col justify-end">
                                             <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Saldo Livre</p>
                                             <h4 className={`text-lg font-black ${budgetBalance < 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
-                                                R$ {budgetBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                                R$ {Number(budgetBalance).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                                             </h4>
                                         </div>
                                     </div>
@@ -604,7 +646,7 @@
                                                 {feedStatsByRep.map((s, i) => (
                                                     <div key={i} className="flex justify-between items-center text-xs border-b border-slate-50 pb-1.5 last:border-0">
                                                         <span className="font-bold text-slate-600 truncate pr-2 uppercase">{i+1}. {s.name}</span>
-                                                        <span className="font-black text-emerald-600 shrink-0">R$ {s.total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                                                        <span className="font-black text-emerald-600 shrink-0">R$ {Number(s.total).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                                                     </div>
                                                 ))}
                                             </div>
@@ -620,7 +662,7 @@
                                                     {feedStatsByAction.map((s, i) => (
                                                         <div key={i} className="flex justify-between items-center text-xs border-b border-slate-50 pb-1.5 last:border-0">
                                                         <span className="font-bold text-slate-600 truncate pr-2 uppercase">{i+1}. {s.name}</span>
-                                                            <span className="font-black text-sky-600 shrink-0">R$ {s.total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                                                            <span className="font-black text-sky-600 shrink-0">R$ {Number(s.total).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                                                         </div>
                                                     ))}
                                                 </div>
@@ -641,7 +683,7 @@
                                                                     <span className="text-[9px] font-black uppercase text-indigo-500">{s.category}</span>
                                                                 </div>
                                                             </div>
-                                                            <span className="font-black text-indigo-600 shrink-0 text-sm">R$ {s.total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                                                            <span className="font-black text-indigo-600 shrink-0 text-sm">R$ {Number(s.total).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                                                         </div>
                                                     ))}
                                                 </div>
@@ -675,9 +717,7 @@
                                             </div>
                                             <div className="text-right shrink-0">
                                                 <p className="font-black text-slate-900 text-sm uppercase tracking-tighter">R$ {String(e.value || '0,00')}</p>
-                                                <p className="text-[10px] text-slate-400 font-bold mt-1">
-                                                    {(e.createdAt && e.createdAt.toLocaleDateString) ? e.createdAt.toLocaleDateString('pt-BR') : ''}
-                                                </p>
+                                                <p className="text-[10px] text-slate-400 font-bold mt-1">{formatDate(e.createdAt)}</p>
                                             </div>
                                         </div>
                                     ))
@@ -693,10 +733,13 @@
                                         <div className="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner"><i className="ph-fill ph-shield-check text-5xl"></i></div>
                                         <h2 className="text-2xl font-black text-slate-800 mb-2 tracking-tight uppercase">Portal do Gestor</h2>
                                         <p className="text-xs text-slate-400 font-bold mt-2">Área restrita à liderança.</p>
+                                        
+                                        {/* FORMULÁRIO DE LOGIN COM A FUNÇÃO RESTAURADA */}
                                         <form onSubmit={handleAdminLogin} className="space-y-6 mt-8">
                                             <input type="password" value={pinInput} onChange={e => setPinInput(e.target.value)} placeholder="PIN" className="w-full p-5 bg-slate-100 rounded-2xl text-center text-4xl font-black tracking-[0.5em] outline-none border-2 border-transparent focus:border-emerald-500 uppercase shadow-inner transition-all" maxLength={6} />
                                             <button type="submit" className="w-full bg-slate-900 text-white font-black py-5 rounded-2xl shadow-xl uppercase text-sm tracking-widest active:scale-95 transition-all">Acessar Painel</button>
                                         </form>
+
                                     </div>
                                 ) : (
                                     <div className="space-y-6">
