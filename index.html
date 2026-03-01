@@ -1,76 +1,82 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang=“pt-BR”>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta charset=“UTF-8”>
+    <meta name=“viewport” content=“width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no”>
     <title>PF BRASIL - GESTÃO DE VERBAS</title>
     
-    <!-- Configuração PWA -->
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="theme-color" content="#0f172a">
+    <!— Configuração PWA —>
+    <meta name=“apple-mobile-web-app-capable” content=“yes”>
+    <meta name=“apple-mobile-web-app-status-bar-style” content=“black-translucent”>
+    <meta name=“theme-color” content=“#0f172a”>
 
-    <!-- Bibliotecas -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/@phosphor-icons/web"></script>
-    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!— Bibliotecas —>
+    <script src=“https://cdn.tailwindcss.com”></script>
+    <script src=“https://unpkg.com/@phosphor-icons/web”></script>
+    <script src=“https://unpkg.com/react@18/umd/react.production.min.js”></script>
+    <script src=“https://unpkg.com/react-dom@18/umd/react-dom.production.min.js”></script>
+    <script src=“https://unpkg.com/@babel/standalone/babel.min.js”></script>
 </head>
-<body class="bg-slate-100 text-slate-900 font-sans antialiased">
-    <div id="root"></div>
+<body class=“bg-slate-100 text-slate-900 font-sans antialiased”>
+    <div id=“root”></div>
 
-    <script type="text/babel" data-type="module">
+    <script type=“text/babel” data-type=“module”>
         const { useState, useEffect, useMemo, useCallback } = React;
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, onSnapshot, doc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { initializeApp } from “https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js”;
+        import { getAuth, onAuthStateChanged, signInAnonymously } from “https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js”;
+        import { getFirestore, collection, addDoc, onSnapshot, doc, deleteDoc } from “https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js”;
 
         // CONFIGURAÇÃO FIREBASE
         const firebaseConfig = {
-            apiKey: "AIzaSyBSXiZWea-cXvztxKv28YggNOJioqsBobU",
-            authDomain: "pf-verbas.firebaseapp.com",
-            projectId: "pf-verbas",
-            storageBucket: "pf-verbas.firebasestorage.app",
-            messagingSenderId: "1048653186555",
-            appId: "1:1048653186555:web:2b7945d5e1cf3998b5f75e"
-        };
+            ```javascript
+const firebaseConfig = {
+  apiKey: “AIzaSyBSXiZWea-cXvztxKv28YggNOJioqsBobU”,
+  authDomain: “pf-verbas.firebaseapp.com”,
+  projectId: “pf-verbas”,
+  storageBucket: “pf-verbas.firebasestorage.app”,
+  messagingSenderId: “1048653186555”,
+  appId: “1:1048653186555:web:2b7945d5e1cf3998b5f75e”
+};
 
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
-        const COLLECTION_NAME = 'pf_budget_oficial_2026';
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const COLLECTION_NAME = ‘pf_budget_oficial_2026’;
 
-        // 1. ESTRUTURAS (MAIÚSCULAS + RENOMEAÇÕES)
-        const TEAMS = [
-            "DISTRITAL RIO TOTAL",
-            "DISTRITAL MG/ES",
-            "DISTRITAL NNE",
-            "DISTRITAL SPC1",
-            "DISTRITAL SPC2",
-            "DISTRITAL SPI/BSB",
-            "DISTRITAL SPI/GNY",
-            "DISTRITAL SUL",
-            "GERENTE NACIONAL DE VISITAÇÃO MÉDICA",
-            "GERENTE NACIONAL DE EXECUÇÃO",
-            "DIRETORIA (MATRIZ)"
-        ];
+// 1. ESTRUTURAS (MAIÚSCULAS + RENOMEAÇÕES)
+const TEAMS = [
+  “DISTRITAL RIO TOTAL”,
+  “DISTRITAL MG/ES”,
+  “DISTRITAL NNE”,
+  “DISTRITAL SPC1”,
+  “DISTRITAL SPC2”,
+  “DISTRITAL SPI/BSB”,
+  “DISTRITAL SPI/GNY”,
+  “DISTRITAL SUL”,
+  “GERENTE NACIONAL DE VISITAÇÃO MÉDICA”,
+  “GERENTE NACIONAL DE EXECUÇÃO”,
+  “DIRETORIA (MATRIZ)”
+];
 
-        // 2. REPRESENTANTES (CHAVES E NOMES EM MAIÚSCULAS)
-        const REPRESENTATIVES = {
-            "DISTRITAL RIO TOTAL": [
-                "CARLOS OTAVIO", "LIVIA NUNES DO AMARAL", "GUSTAVO GOMES DE ARAGAO PEDRA E CAL", 
-                "VALERIA DIAS DA COSTA", "THAIS SANTANNA RIBEIRO", "CARLOS EDUARDO DO NASCIMENTO SOARES",
-                "FERNANDA DE JESUS NASCIMENTO", "SIMONE LIMA DE CARVALHO", "FELIPE GOMES",
-                "ARTHUR MARILAC FERREIRA", "ELIZABETH LIMA DA SILVA", "CARINA CARVALHO DIAS DE AMORIM",
-                "ROSIMERE MARIA DA SILVA FALCAO", "DEBORAH DE ALMEIDA LEITE PINTO DE LACERDA",
-                "ISIS DE OLIVEIRA ALVES", "PATRICIA MEIRE DE SOUZA IAMIM SILVA"
-            ],
-            "DISTRITAL MG/ES": [
-                "CALEBE MIRANDA WANDERLEY", "SIMONE SOUSA DA SILVA GENOVEZ", "HELOISA DE BARROS",
-                "MARSEILLE COSTA DE CARVALHO", "JESSICA KAROLINE MOREIRA MARCELINO", "AMANDA DE OLIVEIRA MOURA",
-                "IZABELA SALES ROCHA DELUCCA", "PAULO MARCIO TOFANI DE MELLO JUNIOR", "KENIA OLIVEIRA CANHESTRO",
-                "KELLY CRISTINA PEREIRA DE ARAUJO"
+// 2. REPRESENTANTES (CHAVES E NOMES EM MAIÚSCULAS)
+const REPRESENTATIVES = {
+  “DISTRITAL RIO TOTAL”: [
+    “CARLOS OTAVIO”,
+    “LIVIA NUNES DO AMARAL”,
+    “GUSTAVO GOMES DE ARAGAO PEDRA E CAL”,
+    “VALERIA DIAS DA COSTA”,
+    “THAIS SANTANNA RIBEIRO”,
+    “CARLOS EDUARDO DO NASCIMENTO SOARES”,
+    “FERNANDA DE JESUS NASCIMENTO”,
+    “SIMONE LIMA DE CARVALHO”,
+    “FELIPE GOMES”,
+    “ARTHUR MARILAC FERREIRA”,
+    “ELIZABETH LIMA DA SILVA”,
+    “CARINA CARVALHO DIAS DE AMORIM”
+  ]
+};
+```
+                ROSIMERE MARIA DA SILVA FALCAO, DEBORAH DE ALMEIDA LEITE PINTO DE LACERDA, ISIS DE OLIVEIRA ALVES e PATRICIA MEIRE DE SOUZA IAMIM SILVA são os candidatos do Distrito Federal e Espírito Santo. Os candidatos de Minas Gerais e Espírito Santo são CALEBE MIRANDA WANDERLEY, SIMONE SOUSA DA SILVA GENOVEZ, HELOISA DE BARROS, MARSEILLE COSTA DE CARVALHO, JESSICA KAROLINE MOREIRA MARCELINO, AMANDA DE OLIVEIRA MOURA, IZABELA SALES ROCHA DELUCCA, PAULO MARCIO TOFANI DE MELLO JUNIOR, KENIA OLIVEIRA CANHESTRO e KELLY CRI.STINA PEREIRA DE ARAUJO"
             ],
             "DISTRITAL NNE": [
                 "SUELLEN VASCONCELOS", "LEILA MARIA BRIZENO ALVES SETUBAL", "JOSE BERNARDO SOUZA SILVA OLIVEIRA",
