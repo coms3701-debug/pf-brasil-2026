@@ -182,15 +182,15 @@
                 }
             }, []);
 
-            const notify = (msg, type = 'success') => {
+            const notify = useCallback((msg, type = 'success') => {
                 setStatus({ type, msg });
                 setTimeout(() => setStatus({ type: '', msg: '' }), 4000);
-            };
+            }, []);
 
             useEffect(() => {
                 signInAnonymously(auth).catch(() => notify("Erro de ligação", "error"));
                 return onAuthStateChanged(auth, setUser);
-            }, []);
+            }, [notify]);
 
             useEffect(() => {
                 if (!user) return;
@@ -209,10 +209,13 @@
                 return () => unsubscribe();
             }, [user]);
 
-            const parseCurrency = (valStr) => parseFloat(String(valStr).replace(/\./g, '').replace(',', '.')) || 0;
+            const parseCurrency = useCallback((valStr) => {
+                if (!valStr) return 0;
+                return parseFloat(String(valStr).replace(/\./g, '').replace(',', '.')) || 0;
+            }, []);
 
             // =========================================================================
-            // FILTRO DE PRIVACIDADE DO FEED 
+            // FILTRO DE PRIVACIDADE DO FEED E CÁLCULOS
             // =========================================================================
             const filteredEntriesAdmin = useMemo(() => {
                 if (!currentAdmin) return [];
@@ -225,24 +228,78 @@
             }, [entries, currentAdmin, adminGeneralFilter]);
 
             const feedEntries = useMemo(() => {
-                if (currentAdmin) return filteredEntriesAdmin; // Se Gestor logado, Feed adapta-se a ele
-                
-                if (formData.requesterName) {
-                    // Representante só vê o que é dele
-                    return entries.filter(e => e.requesterName === formData.requesterName);
-                }
-                return []; // Se não escolheu nome, não vê nada.
+                if (currentAdmin) return filteredEntriesAdmin; 
+                if (formData.requesterName) return entries.filter(e => e.requesterName === formData.requesterName);
+                return []; 
             }, [entries, currentAdmin, filteredEntriesAdmin, formData.requesterName]);
 
-            const totalUsedFeed = useMemo(() => feedEntries.reduce((acc, curr) => acc + parseCurrency(curr.value), 0), [feedEntries]);
+            const totalUsedFeed = useMemo(() => feedEntries.reduce((acc, curr) => acc + parseCurrency(curr.value), 0), [feedEntries, parseCurrency]);
             
             const budgetBalance = useMemo(() => {
                 const ceiling = parseFloat(String(budgetCeiling).replace(/\./g, '').replace(',', '.')) || 0;
                 return ceiling - totalUsedFeed;
             }, [budgetCeiling, totalUsedFeed]);
 
+            // =========================================================================
+            // RANKINGS PARA A ABA FEED (AGRUPAMENTOS)
+            // =========================================================================
+            const feedStatsByRep = useMemo(() => {
+                const groups = feedEntries.reduce((acc, curr) => {
+                    const name = curr.requesterName || "NÃO IDENTIFICADO";
+                    if (!acc[name]) acc[name] = { total: 0, count: 0 };
+                    acc[name].total += parseCurrency(curr.value);
+                    acc[name].count += 1;
+                    return acc;
+                }, {});
+                return Object.entries(groups).map(([name, data]) => ({ name, ...data })).sort((a, b) => b.total - a.total);
+            }, [feedEntries, parseCurrency]);
+
+            const feedStatsByAction = useMemo(() => {
+                const groups = feedEntries.reduce((acc, curr) => {
+                    const type = curr.actionType || "NÃO DEFINIDA";
+                    if (!acc[type]) acc[type] = { total: 0, count: 0 };
+                    acc[type].total += parseCurrency(curr.value);
+                    acc[type].count += 1;
+                    return acc;
+                }, {});
+                return Object.entries(groups).map(([name, data]) => ({ name, ...data })).sort((a, b) => b.total - a.total);
+            }, [feedEntries, parseCurrency]);
+
+            const feedStatsByDoctor = useMemo(() => {
+                const groups = feedEntries.reduce((acc, curr) => {
+                    const crmKey = (curr.crm || "").trim().toUpperCase();
+                    const groupKey = crmKey || (curr.doctorName || "DESCONHECIDO").trim().toUpperCase();
+                    
+                    if (!acc[groupKey]) {
+                        acc[groupKey] = { 
+                            total: 0, 
+                            count: 0, 
+                            doctorName: curr.doctorName || "DESCONHECIDO", 
+                            category: curr.category || "-",
+                            crm: crmKey || "-",
+                            createdAt: curr.createdAt?.getTime() || 0
+                        };
+                    } else {
+                        // Mantém sempre o nome mais antigo associado àquele CRM para evitar duplicação
+                        const currTime = curr.createdAt?.getTime() || 0;
+                        if (currTime < acc[groupKey].createdAt) {
+                            acc[groupKey].doctorName = curr.doctorName || "DESCONHECIDO";
+                            acc[groupKey].category = curr.category || "-";
+                            acc[groupKey].createdAt = currTime;
+                        }
+                    }
+                    acc[groupKey].total += parseCurrency(curr.value);
+                    acc[groupKey].count += 1;
+                    return acc;
+                }, {});
+                return Object.values(groups).sort((a, b) => b.total - a.total);
+            }, [feedEntries, parseCurrency]);
+
+            // =========================================================================
+            // ESTATÍSTICAS DO ADMIN
+            // =========================================================================
             const countEntriesAdmin = filteredEntriesAdmin.length;
-            const totalInvestedAdmin = useMemo(() => filteredEntriesAdmin.reduce((acc, curr) => acc + parseCurrency(curr.value), 0), [filteredEntriesAdmin]);
+            const totalInvestedAdmin = useMemo(() => filteredEntriesAdmin.reduce((acc, curr) => acc + parseCurrency(curr.value), 0), [filteredEntriesAdmin, parseCurrency]);
 
             const statsByTeam = useMemo(() => {
                 const groups = filteredEntriesAdmin.reduce((acc, curr) => {
@@ -253,24 +310,7 @@
                     return acc;
                 }, {});
                 return Object.entries(groups).map(([name, data]) => ({ name, ...data })).sort((a, b) => b.total - a.total);
-            }, [filteredEntriesAdmin]);
-
-            const statsByUser = useMemo(() => {
-                const groups = filteredEntriesAdmin.reduce((acc, curr) => {
-                    const name = curr.requesterName || "N/A";
-                    if (!acc[name]) acc[name] = { total: 0, count: 0 };
-                    acc[name].total += parseCurrency(curr.value);
-                    acc[name].count += 1;
-                    return acc;
-                }, {});
-                return Object.entries(groups).map(([name, data]) => ({ name, ...data })).sort((a, b) => b.total - a.total);
-            }, [filteredEntriesAdmin]);
-
-            const getBarWidth = (val, max) => {
-                if (!max || max <= 0) return '0%';
-                const p = (val / max) * 100;
-                return `${Math.min(100, Math.max(0, p))}%`;
-            };
+            }, [filteredEntriesAdmin, parseCurrency]);
 
             const handleSubmit = async (e) => {
                 e.preventDefault();
@@ -280,7 +320,7 @@
                 }
                 try {
                     await addDoc(collection(db, COLLECTION_NAME), { ...formData, userId: user.uid, createdAt: new Date() });
-                    setFormData({ ...formData, doctorName: '', crm: '', value: '', observations: '', category: '', actionType: '' }); // Mantém nome e equipa
+                    setFormData({ ...formData, doctorName: '', crm: '', value: '', observations: '', category: '', actionType: '' }); 
                     notify("REGISTADO COM SUCESSO!");
                     setView('history');
                 } catch (err) { alert("Erro ao gravar: " + err.message); }
@@ -422,13 +462,13 @@
                         {view === 'history' && (
                             <div className="space-y-5 animate-in slide-in-from-bottom-4 duration-500 pb-10">
                                 
-                                {/* PAINEL FINANCEIRO DE CONTROLO DE VERBA */}
+                                {/* PAINEL FINANCEIRO */}
                                 <div className="bg-slate-900 rounded-[2rem] p-6 shadow-2xl text-white space-y-5 border border-slate-800 relative overflow-hidden">
                                     <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 rounded-full blur-3xl"></div>
                                     <div className="flex justify-between items-center border-b border-slate-800 pb-4 relative z-10">
                                         <div>
                                             <p className="text-[10px] font-black text-emerald-400 uppercase tracking-[0.2em] mb-1">
-                                                {currentAdmin ? "Utilizado na Equipa" : "Seu Total Utilizado"}
+                                                {currentAdmin ? "Utilizado na Equipe" : "Seu Total Utilizado"}
                                             </p>
                                             <h4 className="text-2xl font-black tracking-tight">R$ {totalUsedFeed.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h4>
                                         </div>
@@ -456,9 +496,66 @@
                                     </div>
                                 </div>
 
+                                {/* RANKINGS INTERNOS DO FEED */}
+                                <div className="space-y-4">
+                                    {/* Rank por Representante */}
+                                    {feedStatsByRep.length > 0 && currentAdmin && (
+                                        <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
+                                            <h3 className="text-[10px] font-black text-slate-800 uppercase tracking-widest mb-3 border-l-2 border-emerald-500 pl-2">Top Representantes</h3>
+                                            <div className="space-y-2 max-h-32 overflow-y-auto pr-2">
+                                                {feedStatsByRep.map((s, i) => (
+                                                    <div key={i} className="flex justify-between items-center text-xs border-b border-slate-50 pb-1.5 last:border-0">
+                                                        <span className="font-bold text-slate-600 truncate pr-2 uppercase">{i+1}. {s.name}</span>
+                                                        <span className="font-black text-emerald-600 shrink-0">R$ {s.total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    <div className="grid grid-cols-1 gap-4">
+                                        {/* Rank por Tipo de Ação */}
+                                        {feedStatsByAction.length > 0 && (
+                                            <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
+                                                <h3 className="text-[10px] font-black text-slate-800 uppercase tracking-widest mb-3 border-l-2 border-sky-500 pl-2">Top Ações</h3>
+                                                <div className="space-y-2 max-h-32 overflow-y-auto pr-2">
+                                                    {feedStatsByAction.map((s, i) => (
+                                                        <div key={i} className="flex justify-between items-center text-xs border-b border-slate-50 pb-1.5 last:border-0">
+                                                            <span className="font-bold text-slate-600 truncate pr-2 uppercase">{i+1}. {s.name}</span>
+                                                            <span className="font-black text-sky-600 shrink-0">R$ {s.total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Rank por Médico (Agrupado por CRM) */}
+                                        {feedStatsByDoctor.length > 0 && (
+                                            <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
+                                                <h3 className="text-[10px] font-black text-slate-800 uppercase tracking-widest mb-3 border-l-2 border-indigo-500 pl-2">Top Médicos (Por CRM)</h3>
+                                                <div className="space-y-3 max-h-48 overflow-y-auto pr-2">
+                                                    {feedStatsByDoctor.map((s, i) => (
+                                                        <div key={i} className="flex justify-between items-center text-xs border-b border-slate-50 pb-2 last:border-0">
+                                                            <div className="flex flex-col min-w-0 pr-2">
+                                                                <span className="font-bold text-slate-700 truncate uppercase">{i+1}. {s.doctorName}</span>
+                                                                <div className="flex items-center gap-1.5 mt-0.5">
+                                                                    <span className="text-[9px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-bold">{s.crm}</span>
+                                                                    <span className="text-[9px] font-black uppercase text-indigo-500">{s.category}</span>
+                                                                </div>
+                                                            </div>
+                                                            <span className="font-black text-indigo-600 shrink-0 text-sm">R$ {s.total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* LISTA DETALHADA DE LANÇAMENTOS */}
                                 <div className="flex justify-between items-center px-3 mt-8">
                                     <h2 className="text-xs font-black text-slate-400 uppercase tracking-widest border-l-4 border-emerald-500 pl-2">
-                                        {currentAdmin ? `Atividades: ${currentAdmin.team}` : "Seus Lançamentos"}
+                                        {currentAdmin ? `Atividades Detalhadas` : "Seus Lançamentos"}
                                     </h2>
                                 </div>
                                 
@@ -467,13 +564,13 @@
                                         <i className="ph-fill ph-warning-circle text-4xl text-slate-300 mb-3"></i>
                                         <p className="text-xs font-black text-slate-400 uppercase tracking-widest leading-relaxed">
                                             {!formData.requesterName && !currentAdmin
-                                                ? "Selecione seu nome na aba NOVO para visualizar seus lançamentos."
+                                                ? "Selecione seu nome na aba NOVO para visualizar."
                                                 : "Nenhum lançamento encontrado."}
                                         </p>
                                     </div>
                                 ) : (
                                     feedEntries.map(e => (
-                                        <div key={e.id} className="bg-white p-5 rounded-2xl shadow-md border border-slate-100 flex justify-between items-center active:scale-[0.98] transition-all">
+                                        <div key={e.id} className="bg-white p-5 rounded-2xl shadow-md border border-slate-100 flex justify-between items-start active:scale-[0.98] transition-all">
                                             <div className="min-w-0 pr-4 text-left">
                                                 <span className="text-[9px] font-black text-emerald-600 uppercase bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-100">{e.team}</span>
                                                 <h3 className="font-bold text-slate-800 text-sm truncate mt-2 uppercase leading-tight">{e.doctorName}</h3>
@@ -498,7 +595,10 @@
                                         <h2 className="text-2xl font-black text-slate-800 mb-2 tracking-tight uppercase">Portal do Gestor</h2>
                                         <p className="text-xs text-slate-400 font-bold mt-2">Área restrita à liderança.</p>
                                         <form onSubmit={e => { e.preventDefault(); if (ADMIN_USERS[pinInput]) { setCurrentAdmin(ADMIN_USERS[pinInput]); setPinInput(''); } else { alert("PIN INCORRETO"); } }} className="space-y-6 mt-8">
-                                            <input type="password" value={pinInput} onChange={e => setPinInput(e.target.value)} placeholder="INSERIR PIN" className="w-full p-5 bg-slate-100 rounded-2xl text-center text-3xl font-black tracking-[0.5em] outline-none border-2 border-transparent focus:border-emerald-500 uppercase shadow-inner transition-all" maxLength={6} />
+                                            
+                                            {/* CAMPO DE PIN AJUSTADO PARA NÃO ESTOURAR O TEXTO */}
+                                            <input type="password" value={pinInput} onChange={e => setPinInput(e.target.value)} placeholder="PIN" className="w-full p-5 bg-slate-100 rounded-2xl text-center text-4xl font-black tracking-[0.5em] outline-none border-2 border-transparent focus:border-emerald-500 uppercase shadow-inner transition-all" maxLength={6} />
+                                            
                                             <button type="submit" className="w-full bg-slate-900 text-white font-black py-5 rounded-2xl shadow-xl uppercase text-sm tracking-widest active:scale-95 transition-all">Acessar Painel</button>
                                         </form>
                                     </div>
@@ -531,6 +631,25 @@
                                                     <div className="bg-white p-6 rounded-[2rem] shadow-lg border border-slate-200 text-center uppercase"><p className="text-[10px] font-black text-slate-400 mb-2 tracking-widest leading-none">Investimento</p><h4 className="text-lg font-black text-emerald-600 leading-none">R$ {Number(totalInvestedAdmin).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h4></div>
                                                     <div className="bg-white p-6 rounded-[2rem] shadow-lg border border-slate-200 text-center uppercase"><p className="text-[10px] font-black text-slate-400 mb-2 tracking-widest leading-none">Total Lançamentos</p><h4 className="text-3xl font-black text-slate-800 leading-none">{countEntriesAdmin}</h4></div>
                                                 </div>
+
+                                                {/* NOVO RANKING: TOTAL POR DISTRITAL (EXCLUSIVO ADMIN GERAL) */}
+                                                {currentAdmin.isGeneral && (
+                                                    <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100">
+                                                        <h3 className="text-[10px] font-black text-slate-800 uppercase tracking-[0.2em] mb-6 flex items-center gap-2"><i className="ph-bold ph-map-pin text-emerald-500 text-lg"></i> Total por Distrital / Equipa</h3>
+                                                        <div className="space-y-4 max-h-64 overflow-y-auto pr-2">
+                                                            {statsByTeam.map((s, i) => (
+                                                                <div key={i} className="space-y-2 animate-in slide-in-from-left-2 duration-300 border-b border-slate-50 pb-2 last:border-0">
+                                                                    <div className="flex justify-between text-[11px] font-bold uppercase">
+                                                                        <span className="text-slate-600 truncate pr-4 leading-none">{i+1}. {s.name}</span>
+                                                                        <span className="text-emerald-700 font-black shrink-0">R$ {Number(s.total).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                                                                    </div>
+                                                                    <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden shadow-inner"><div className="bg-emerald-500 h-full rounded-full transition-all duration-1000" style={{ width: totalInvestedAdmin > 0 ? `${(s.total/totalInvestedAdmin)*100}%` : '0%' }}></div></div>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
+
                                             </div>
                                         ) : (
                                             <div className="space-y-5 animate-in slide-in-from-left-4 duration-300">
