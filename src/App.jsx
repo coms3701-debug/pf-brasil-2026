@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, onAuthStateChanged, signInAnonymously } from 'firebase/auth';
-import { getFirestore, collection, addDoc, onSnapshot, doc, deleteDoc } from 'firebase/firestore';
+import { getFirestore, collection, addDoc, onSnapshot, doc, deleteDoc, updateDoc } from 'firebase/firestore';
 
 // =============================================================
 // CONFIGURAÇÃO DO BANCO DE DADOS (FIREBASE GOOGLE)
@@ -17,8 +17,6 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
-
-// INICIALIZAÇÃO PADRÃO (SEM AS FUNÇÕES EXPERIMENTAIS QUE QUEBRAVAM O CÓDIGO)
 const db = getFirestore(app);
 
 const COLLECTION_NAME = 'pf_budget_oficial_2026';
@@ -107,6 +105,147 @@ const ADMIN_USERS = {
     "1008": { name: "GESTOR SUL", isGeneral: false, team: "DISTRITAL SUL" }
 };
 
+// =========================================================================
+// COMPONENTE: TOUCH SELECT (MENU SUSPENSO COM VIBRAÇÃO E DESTAQUE)
+// =========================================================================
+const TouchSelect = ({ name, value, onChange, options, placeholder }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const [highlight, setHighlight] = useState(-1);
+
+    const handleMove = (e) => {
+        if (e.touches.length !== 1) return;
+        const touch = e.touches[0];
+        const elem = document.elementFromPoint(touch.clientX, touch.clientY);
+        
+        if (elem && elem.dataset && elem.dataset.index !== undefined) {
+            const idx = Number(elem.dataset.index);
+            if (idx !== highlight) {
+                setHighlight(idx);
+                // Feedback Tátil nativo (Android/iOS Suportado)
+                if (navigator.vibrate) navigator.vibrate(15); 
+            }
+        } else {
+            setHighlight(-1);
+        }
+    };
+
+    const handleEnd = () => {
+        if (highlight >= 0 && options[highlight]) {
+            onChange({ target: { name, value: options[highlight] } });
+            if (navigator.vibrate) navigator.vibrate([30, 50, 30]); // Vibração de confirmação
+        }
+        setIsOpen(false);
+        setHighlight(-1);
+    };
+
+    return (
+        <>
+            <div onClick={() => setIsOpen(true)} className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl font-bold text-sm outline-none transition-all active:scale-[0.98] active:shadow-inner flex justify-between items-center cursor-pointer">
+                <span className={value ? "text-slate-800 uppercase" : "text-[10px] text-slate-400 uppercase"}>{value || placeholder}</span>
+                <span className="text-slate-400 text-[10px]">▼</span>
+            </div>
+
+            {isOpen && (
+                <div className="fixed inset-0 z-[120] flex items-end justify-center bg-slate-900/60 backdrop-blur-sm" onClick={() => setIsOpen(false)}>
+                    <div 
+                        className="w-full max-w-md bg-white rounded-t-[2rem] p-6 pb-12 max-h-[75vh] overflow-y-auto shadow-2xl"
+                        onClick={e => e.stopPropagation()}
+                        onTouchMove={handleMove}
+                        onTouchEnd={handleEnd}
+                    >
+                        <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-6"></div>
+                        <p className="text-[10px] font-black text-slate-400 mb-4 uppercase text-center tracking-widest">Deslize ou Toque para Escolher</p>
+                        
+                        <div className="space-y-2">
+                            {options.map((opt, i) => (
+                                <div 
+                                    key={opt} 
+                                    data-index={i}
+                                    onClick={() => { onChange({ target: { name, value: opt }}); setIsOpen(false); }}
+                                    className={`p-4 rounded-2xl transition-all duration-200 cursor-pointer border ${value === opt || highlight === i ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/30 scale-[1.03] border-emerald-400' : 'bg-slate-50 text-slate-700 border-slate-100 hover:bg-slate-100'}`}
+                                >
+                                    <span className="text-sm font-bold uppercase">{opt}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            )}
+        </>
+    );
+};
+
+// =========================================================================
+// COMPONENTE: SWIPEABLE ENTRY (ARRASTAR PARA EDITAR/EXCLUIR)
+// =========================================================================
+const SwipeableEntry = ({ entry, onEdit, onDelete, currentAdmin, adminGeneralFilter }) => {
+    const [startX, setStartX] = useState(0);
+    const [startY, setStartY] = useState(0);
+    const [offsetX, setOffsetX] = useState(0);
+    
+    const handleStart = (e) => {
+        setStartX(e.touches[0].clientX);
+        setStartY(e.touches[0].clientY);
+    };
+    
+    const handleMove = (e) => {
+        const diffX = e.touches[0].clientX - startX;
+        const diffY = e.touches[0].clientY - startY;
+        
+        // Bloqueia o swipe horizontal se estivermos a fazer scroll na vertical
+        if (Math.abs(diffY) > Math.abs(diffX)) return;
+        
+        if (diffX > 120) setOffsetX(120);
+        else if (diffX < -120) setOffsetX(-120);
+        else setOffsetX(diffX);
+    };
+    
+    const handleEnd = () => {
+        if (offsetX > 70) onEdit(entry); // Swipe Direita (Editar)
+        else if (offsetX < -70) onDelete(entry); // Swipe Esquerda (Excluir)
+        setOffsetX(0); // Volta à posição original
+    };
+
+    return (
+        <div className="relative rounded-2xl overflow-hidden mb-3 bg-slate-200 border border-slate-200">
+            {/* Ações de Fundo */}
+            <div className="absolute inset-0 flex justify-between items-center px-5">
+                <div className={`font-black flex items-center gap-2 transition-opacity duration-200 ${offsetX > 0 ? 'opacity-100 text-emerald-600' : 'opacity-0'}`}>
+                    <span className="text-2xl">✏️</span> EDITAR
+                </div>
+                <div className={`font-black flex items-center gap-2 transition-opacity duration-200 ${offsetX < 0 ? 'opacity-100 text-rose-600' : 'opacity-0'}`}>
+                    EXCLUIR <span className="text-2xl">🗑️</span>
+                </div>
+            </div>
+
+            {/* Cartão de Superfície */}
+            <div 
+                onTouchStart={handleStart}
+                onTouchMove={handleMove}
+                onTouchEnd={handleEnd}
+                style={{ transform: `translateX(${offsetX}px)`, transition: offsetX === 0 ? 'transform 0.3s ease' : 'none' }}
+                className="relative bg-white p-4 rounded-2xl shadow-sm flex justify-between items-center z-10"
+            >
+                <div className="flex-1 min-w-0 pr-2 pointer-events-none">
+                    <div className="flex items-center gap-2 mb-0.5">
+                        <p className="text-[10px] font-bold text-slate-500 uppercase">{entry.requesterName}</p>
+                        {currentAdmin && currentAdmin.isGeneral && adminGeneralFilter === 'ALL' && (
+                            <span className="text-[8px] bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded uppercase font-bold">{entry.team}</span>
+                        )}
+                    </div>
+                    <p className="font-bold text-slate-800 text-sm truncate">{entry.doctorName} <span className="text-slate-400 font-normal ml-1">({entry.category})</span></p>
+                    <p className="text-xs font-semibold text-slate-600 mt-1">R$ {entry.value} - <span className="font-normal text-slate-500">{entry.actionType}</span></p>
+                    {entry.observations && <p className="text-[10px] text-slate-400 italic mt-1 truncate">Det: {entry.observations}</p>}
+                </div>
+            </div>
+        </div>
+    );
+};
+
+
+// =========================================================================
+// APLICATIVO PRINCIPAL
+// =========================================================================
 export default function App() {
     const [user, setUser] = useState(null);
     const [entries, setEntries] = useState([]);
@@ -114,15 +253,17 @@ export default function App() {
     const [view, setView] = useState('form'); 
     const [status, setStatus] = useState({ type: '', msg: '' });
     const [showSuccessPopup, setShowSuccessPopup] = useState(false);
+    
+    // Admin States
     const [currentAdmin, setCurrentAdmin] = useState(null);
     const [pinInput, setPinInput] = useState('');
     const [adminTab, setAdminTab] = useState('reports'); 
     const [adminGeneralFilter, setAdminGeneralFilter] = useState('ALL');
+    
+    // Edição e Exclusão
     const [deleteTarget, setDeleteTarget] = useState(null);
+    const [editingEntry, setEditingEntry] = useState(null); // Estado para edição
 
-    // =========================================================================
-    // GESTÃO SEGURA DE MEMÓRIA
-    // =========================================================================
     const [teamBudgets, setTeamBudgets] = useState(() => {
         try { return JSON.parse(localStorage.getItem('pf_team_budgets')) || {}; } 
         catch (e) { return {}; }
@@ -156,9 +297,7 @@ export default function App() {
         setTimeout(() => setStatus({ type: '', msg: '' }), 4000);
     }, []);
 
-    // =========================================================================
-    // FIREBASE AUTH & FETCH
-    // =========================================================================
+    // FIREBASE INIT
     useEffect(() => {
         signInAnonymously(auth).catch(() => notify("Erro de ligação", "error"));
         return onAuthStateChanged(auth, setUser);
@@ -189,9 +328,7 @@ export default function App() {
         return () => unsubscribe();
     }, [user]);
 
-    // =========================================================================
-    // CÁLCULOS E FILTROS 
-    // =========================================================================
+    // CÁLCULOS E FILTROS
     const parseCurrency = useCallback((valStr) => {
         if (!valStr) return 0;
         return parseFloat(String(valStr).replace(/\./g, '').replace(',', '.')) || 0;
@@ -261,9 +398,6 @@ export default function App() {
         catch(e) { return 0; }
     }, [displayBudgetCeiling, totalUsedFeed]);
 
-    // =========================================================================
-    // EXPORTAR EXCEL
-    // =========================================================================
     const exportToCSV = () => {
         try {
             const dataToExport = currentAdmin ? filteredEntriesAdmin : feedEntries;
@@ -290,9 +424,7 @@ export default function App() {
         } catch (err) { notify("Falha ao exportar", "error"); }
     };
 
-    // =========================================================================
     // RANKINGS
-    // =========================================================================
     const feedStatsByRep = useMemo(() => {
         try {
             const groups = feedEntries.reduce((acc, curr) => {
@@ -365,26 +497,61 @@ export default function App() {
         } catch(e) { return []; }
     }, [filteredEntriesAdmin, parseCurrency]);
 
-    // =========================================================================
-    // EVENTOS DO FORMULÁRIO E ADMIN
-    // =========================================================================
+    // EVENTOS
+    const handleInputChange = (e) => {
+        const { name, value } = e.target;
+        if (name === 'team') {
+            setFormData(prev => ({ ...prev, team: value, requesterName: '' }));
+        } else if (name === 'value') {
+            setFormData(prev => ({ ...prev, [name]: formatValueInput(value) }));
+        } else {
+            setFormData(prev => ({ ...prev, [name]: value }));
+        }
+    };
+
+    const handleEditChange = (e) => {
+        const { name, value } = e.target;
+        if (name === 'team') {
+            setEditingEntry(prev => ({ ...prev, team: value, requesterName: '' }));
+        } else if (name === 'value') {
+            setEditingEntry(prev => ({ ...prev, [name]: formatValueInput(value) }));
+        } else {
+            setEditingEntry(prev => ({ ...prev, [name]: value }));
+        }
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
+        if (!user) return alert("Aguarde a ligação ao servidor");
+        
         const { team, requesterName, doctorName, value, observations, crm, category, actionType } = formData;
-        if (!team || !requesterName || !doctorName || !value || !observations || !crm || !category || !actionType) {
+        if (!team || !requesterName || !doctorName || !value || !crm || !category || !actionType) {
             return alert("Preencha todos os campos obrigatórios.");
         }
         try {
             await addDoc(collection(db, COLLECTION_NAME), { ...formData, userId: user.uid, createdAt: new Date() });
             setFormData({ ...formData, doctorName: '', crm: '', value: '', observations: '', category: '', actionType: '' }); 
-            
             setShowSuccessPopup(true);
-            setTimeout(() => {
-                setShowSuccessPopup(false);
-            }, 3500); 
-            
+            setTimeout(() => { setShowSuccessPopup(false); }, 3500); 
             setView('history');
         } catch (err) { alert("Erro ao gravar: " + err.message); }
+    };
+
+    const handleEditSubmit = async (e) => {
+        e.preventDefault();
+        const { team, requesterName, doctorName, value, crm, category, actionType } = editingEntry;
+        if (!team || !requesterName || !doctorName || !value || !crm || !category || !actionType) {
+            return notify("Preencha todos os campos obrigatórios.", "error");
+        }
+        try {
+            await updateDoc(doc(db, COLLECTION_NAME, editingEntry.id), {
+                team, requesterName, doctorName, value, crm, category, actionType, observations: editingEntry.observations || ''
+            });
+            setEditingEntry(null);
+            notify("Lançamento atualizado com sucesso!");
+        } catch(err) {
+            notify("Erro ao atualizar a base de dados.", "error");
+        }
     };
 
     const confirmDelete = async () => {
@@ -394,7 +561,7 @@ export default function App() {
             await deleteDoc(doc(db, COLLECTION_NAME, deleteTarget.id));
             setDeleteTarget(null);
             notify("LANÇAMENTO REMOVIDO.");
-        } catch (err) { alert("Erro ao excluir."); }
+        } catch (err) { notify("Erro ao excluir.", "error"); }
     };
 
     const handleAdminLogin = (e) => {
@@ -409,6 +576,7 @@ export default function App() {
 
     const logoutAdmin = () => { setCurrentAdmin(null); setPinInput(''); };
     const currentReps = REPRESENTATIVES[formData.team] || [];
+    const editingReps = editingEntry ? (REPRESENTATIVES[editingEntry.team] || []) : [];
 
     const isAllTeams = currentAdmin && currentAdmin.isGeneral && adminGeneralFilter === 'ALL';
     const hasNoTeam = !currentAdmin && !formData.team;
@@ -426,6 +594,7 @@ export default function App() {
     return (
         <div className="min-h-screen bg-slate-100 pb-24 text-slate-900 font-sans">
             
+            {/* POP-UP DE SUCESSO */}
             {showSuccessPopup && (
                 <div className="fixed inset-0 z-[110] flex items-center justify-center p-6 animate-in fade-in duration-300">
                     <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-sm" onClick={() => setShowSuccessPopup(false)}></div>
@@ -444,6 +613,7 @@ export default function App() {
                 </div>
             )}
 
+            {/* MODAL DE EXCLUSÃO */}
             {deleteTarget && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 animate-in fade-in duration-200">
                     <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setDeleteTarget(null)}></div>
@@ -455,6 +625,56 @@ export default function App() {
                             <button onClick={confirmDelete} className="w-full bg-rose-600 text-white font-black py-4 rounded-2xl active:scale-95 transition-all shadow-lg uppercase text-sm tracking-widest">Sim, Apagar</button>
                             <button onClick={() => setDeleteTarget(null)} className="w-full bg-slate-100 text-slate-500 font-bold py-4 rounded-2xl active:scale-95 transition-all uppercase text-sm">Cancelar</button>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* MODAL DE EDIÇÃO COMPLETA (AO ARRASTAR PARA A DIREITA) */}
+            {editingEntry && (
+                <div className="fixed inset-0 z-[105] flex items-end justify-center bg-slate-900/80 backdrop-blur-sm" onClick={() => setEditingEntry(null)}>
+                    <div 
+                        className="w-full bg-white rounded-t-[2.5rem] p-6 pb-10 max-h-[85vh] overflow-y-auto shadow-2xl animate-in slide-in-from-bottom-full duration-300" 
+                        onClick={e => e.stopPropagation()}
+                    >
+                        <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-6"></div>
+                        <h2 className="text-sm font-black text-emerald-600 uppercase tracking-widest mb-6 flex items-center justify-center gap-2">
+                            <span className="text-xl">✏️</span> Alterar Lançamento
+                        </h2>
+                        
+                        <form onSubmit={handleEditSubmit} className="space-y-5">
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-bold text-slate-500 ml-1 uppercase tracking-widest italic">Estrutura</label>
+                                <TouchSelect name="team" value={editingEntry.team} onChange={handleEditChange} options={TEAMS} placeholder="ESTRUTURA" />
+                            </div>
+
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-bold text-slate-500 ml-1 uppercase tracking-widest italic">Solicitante</label>
+                                {editingReps.length > 0 ? (
+                                    <TouchSelect name="requesterName" value={editingEntry.requesterName} onChange={handleEditChange} options={[...editingReps, "OUTRO (MANUAL)"]} placeholder="SEU NOME" />
+                                ) : (
+                                    <input value={editingEntry.requesterName} onChange={handleEditChange} name="requesterName" placeholder="NOME COMPLETO" disabled={!editingEntry.team} className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl font-bold text-sm outline-none uppercase focus:border-emerald-500" />
+                                )}
+                            </div>
+
+                            <input name="doctorName" value={editingEntry.doctorName} onChange={handleEditChange} placeholder="NOME DO MÉDICO / DESTINATÁRIO" className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl font-bold text-sm outline-none focus:border-emerald-500 transition-all uppercase placeholder:text-slate-400" />
+                            
+                            <div className="grid grid-cols-2 gap-4">
+                                <input name="crm" value={editingEntry.crm} onChange={handleEditChange} placeholder="UF-CRM" maxLength={7} className="p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl font-bold text-sm outline-none uppercase focus:border-emerald-500 transition-all placeholder:text-slate-400" />
+                                <input name="value" value={editingEntry.value} onChange={handleEditChange} placeholder="R$ 0,00" className="p-4 bg-emerald-50 border-2 border-emerald-100 rounded-2xl font-black text-emerald-800 text-sm outline-none focus:border-emerald-500 transition-all text-center placeholder:text-emerald-400" />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <TouchSelect name="category" value={editingEntry.category} onChange={handleEditChange} options={CATEGORIES} placeholder="CATEGORIA" />
+                                <TouchSelect name="actionType" value={editingEntry.actionType} onChange={handleEditChange} options={ACTION_TYPES} placeholder="AÇÃO" />
+                            </div>
+
+                            <textarea name="observations" value={editingEntry.observations} onChange={handleEditChange} placeholder="DETALHE A AÇÃO AQUI..." rows="3" className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl text-sm font-medium outline-none focus:border-emerald-500 transition-all uppercase placeholder:text-slate-400" />
+                            
+                            <div className="grid grid-cols-2 gap-3 mt-4">
+                                <button type="button" onClick={() => setEditingEntry(null)} className="w-full bg-slate-100 text-slate-500 font-bold py-4 rounded-2xl active:scale-95 transition-all uppercase text-sm">Cancelar</button>
+                                <button type="submit" className="w-full bg-emerald-600 text-white font-black py-4 rounded-2xl shadow-lg active:scale-95 transition-all uppercase text-sm tracking-widest">Salvar</button>
+                            </div>
+                        </form>
                     </div>
                 </div>
             )}
@@ -481,6 +701,7 @@ export default function App() {
             )}
 
             <main className="max-w-md mx-auto p-4">
+                {/* ======================= ABA NOVO ======================= */}
                 {view === 'form' && (
                     <div className="bg-white rounded-[2rem] p-7 shadow-2xl border border-slate-100 animate-in fade-in zoom-in-95">
                         <h2 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] mb-7 flex items-center gap-2">
@@ -490,28 +711,13 @@ export default function App() {
                             
                             <div className="group space-y-1.5">
                                 <label className="text-xs font-bold text-slate-500 ml-1 uppercase tracking-widest italic">Sua Estrutura</label>
-                                <select 
-                                    value={formData.team} 
-                                    onChange={e => setFormData({...formData, team: e.target.value, requesterName: ''})} 
-                                    className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl font-bold text-sm outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-50 transition-all hover:bg-slate-100 hover:border-slate-300 active:scale-[0.98] active:shadow-inner uppercase"
-                                >
-                                    <option value="" className="text-[10px]">SELECIONAR ESTRUTURA...</option>
-                                    {TEAMS.map(t => <option key={t} value={t} className="text-[10px]">{t}</option>)}
-                                </select>
+                                <TouchSelect name="team" value={formData.team} onChange={handleInputChange} options={TEAMS} placeholder="SELECIONAR ESTRUTURA..." />
                             </div>
 
                             <div className="space-y-1.5">
                                 <label className="text-xs font-bold text-slate-500 ml-1 uppercase tracking-widest italic">Seu Nome (Solicitante)</label>
                                 {currentReps.length > 0 ? (
-                                    <select 
-                                        value={formData.requesterName} 
-                                        onChange={e => setFormData({...formData, requesterName: e.target.value})} 
-                                        className="w-full p-4 bg-emerald-50 border-2 border-emerald-100 rounded-2xl font-bold text-sm outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-50 hover:bg-emerald-100 transition-all active:scale-[0.98] shadow-inner uppercase"
-                                    >
-                                        <option value="" className="text-[10px]">SELECIONAR SEU NOME...</option>
-                                        {currentReps.map(name => <option key={name} value={name} className="text-[10px]">{name}</option>)}
-                                        <option value="OUTRO" className="text-[10px]">OUTRO (MANUAL)</option>
-                                    </select>
+                                    <TouchSelect name="requesterName" value={formData.requesterName} onChange={handleInputChange} options={[...currentReps, "OUTRO (MANUAL)"]} placeholder="SELECIONAR SEU NOME..." />
                                 ) : (
                                     <input 
                                         value={formData.requesterName} 
@@ -537,14 +743,8 @@ export default function App() {
                             </div>
 
                             <div className="grid grid-cols-2 gap-4">
-                                <select value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})} className="p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl text-sm font-bold focus:border-emerald-500 active:scale-[0.98] transition-all hover:bg-slate-100 uppercase">
-                                    <option value="" className="text-[10px]">CATEGORIA...</option>
-                                    {CATEGORIES.map(c => <option key={c} value={c} className="text-[10px]">{c}</option>)}
-                                </select>
-                                <select value={formData.actionType} onChange={e => setFormData({...formData, actionType: e.target.value})} className="p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl text-sm font-bold focus:border-emerald-500 active:scale-[0.98] transition-all hover:bg-slate-100 uppercase">
-                                    <option value="" className="text-[10px]">AÇÃO...</option>
-                                    {ACTION_TYPES.map(a => <option key={a} value={a} className="text-[10px]">{a}</option>)}
-                                </select>
+                                <TouchSelect name="category" value={formData.category} onChange={handleInputChange} options={CATEGORIES} placeholder="CATEGORIA..." />
+                                <TouchSelect name="actionType" value={formData.actionType} onChange={handleInputChange} options={ACTION_TYPES} placeholder="AÇÃO..." />
                             </div>
 
                             <textarea value={formData.observations} onChange={e => setFormData({...formData, observations: e.target.value})} placeholder="DETALHE A AÇÃO AQUI..." rows="3" className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl text-sm font-medium outline-none focus:border-emerald-500 transition-all uppercase placeholder:text-slate-400" />
@@ -556,6 +756,7 @@ export default function App() {
                     </div>
                 )}
 
+                {/* ======================= ABA FEED ======================= */}
                 {view === 'history' && (
                     <div className="space-y-5 animate-in slide-in-from-bottom-4 duration-500 pb-10">
                         
@@ -685,7 +886,7 @@ export default function App() {
                                         <p className="font-black text-slate-900 text-sm uppercase tracking-tighter">R$ {String(e.value || '0,00')}</p>
                                         <p className="text-[10px] text-slate-400 font-bold mt-1">{formatDate(e.createdAt)}</p>
                                         
-                                        {/* Botão de excluir para o usuário que criou o lançamento na visão "Feed" */}
+                                        {/* Botão de excluir tradicional se necessário */}
                                         {!currentAdmin && e.userId === user?.uid && (
                                             <button onClick={() => setDeleteTarget(e)} className="mt-3 bg-rose-50 text-rose-600 font-bold py-1 px-2 rounded text-[10px] uppercase active:scale-90 transition-all border border-rose-100">
                                                 Excluir
@@ -698,6 +899,7 @@ export default function App() {
                     </div>
                 )}
 
+                {/* ======================= ABA GESTOR (COM O NOVO DESLIZAR) ======================= */}
                 {view === 'admin' && (
                     <div className="animate-in fade-in duration-500">
                         {!currentAdmin ? (
@@ -760,22 +962,29 @@ export default function App() {
 
                                     </div>
                                 ) : (
-                                    <div className="space-y-5 animate-in slide-in-from-left-4 duration-300">
-                                        <div className="bg-rose-50 border border-rose-100 p-5 rounded-2xl flex gap-3 shadow-sm italic text-rose-700 text-xs font-bold uppercase leading-tight items-center">
-                                            <div className="text-xl mr-2">⚠️</div>
-                                            Moderação Ativa: Cuidado, a exclusão é permanente.
-                                        </div>
-                                        {filteredEntriesAdmin.map(e => (
-                                            <div key={e.id} className="bg-white p-5 rounded-2xl shadow-md border border-slate-100 flex justify-between items-center active:scale-[0.98] transition-all">
-                                                <div className="min-w-0 pr-4 text-left">
-                                                    <p className="text-[10px] font-black text-rose-500 uppercase italic tracking-wider mb-1">{String(e.team || '')}</p>
-                                                    <h3 className="font-bold text-slate-800 text-sm truncate uppercase leading-tight">{String(e.doctorName || '')}</h3>
-                                                    <p className="text-[11px] text-slate-500 font-bold uppercase truncate opacity-70 mt-0.5">R$ {String(e.value || '0,00')} • {String(e.requesterName || '')}</p>
-                                                </div>
-                                                <button onClick={() => setDeleteTarget(e)} className="bg-rose-50 text-rose-600 font-bold py-2 px-3 rounded-xl shadow-sm active:scale-90 border border-rose-100 transition-all uppercase text-[10px]">
-                                                    Excluir
-                                                </button>
+                                    <div className="space-y-4 animate-in slide-in-from-left-4 duration-300">
+                                        <div className="bg-emerald-50 border border-emerald-100 p-4 rounded-2xl flex items-center justify-between shadow-sm">
+                                            <div className="flex items-center gap-3">
+                                                <div className="text-2xl">👉</div>
+                                                <p className="text-[10px] text-emerald-800 font-black uppercase tracking-wider leading-tight">Deslize para a direita<br/><span className="text-emerald-600 font-medium">para editar dados</span></p>
                                             </div>
+                                            <div className="w-[1px] h-6 bg-emerald-200"></div>
+                                            <div className="flex items-center gap-3">
+                                                <p className="text-[10px] text-rose-800 font-black uppercase tracking-wider leading-tight text-right">Deslize esquerda<br/><span className="text-rose-600 font-medium">para excluir</span></p>
+                                                <div className="text-2xl">👈</div>
+                                            </div>
+                                        </div>
+                                        
+                                        {/* AQUI ENTRA A LISTA COM OS NOVOS CARTÕES DESLIZANTES */}
+                                        {filteredEntriesAdmin.map(e => (
+                                            <SwipeableEntry 
+                                                key={e.id} 
+                                                entry={e} 
+                                                currentAdmin={currentAdmin} 
+                                                adminGeneralFilter={adminGeneralFilter}
+                                                onEdit={(entry) => setEditingEntry(entry)}
+                                                onDelete={(entry) => setDeleteTarget(entry)}
+                                            />
                                         ))}
                                     </div>
                                 )}
