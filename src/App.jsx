@@ -112,16 +112,26 @@ const TouchSelect = ({ name, value, onChange, options, placeholder }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [highlight, setHighlight] = useState(-1);
 
+    // Evita scroll da página de fundo quando o modal do menu está aberto
+    useEffect(() => {
+        if (isOpen) document.body.style.overflow = 'hidden';
+        else document.body.style.overflow = 'unset';
+        return () => { document.body.style.overflow = 'unset'; };
+    }, [isOpen]);
+
     const handleMove = (e) => {
         if (e.touches.length !== 1) return;
         const touch = e.touches[0];
-        const elem = document.elementFromPoint(touch.clientX, touch.clientY);
         
-        if (elem && elem.dataset && elem.dataset.index !== undefined) {
-            const idx = Number(elem.dataset.index);
+        // Identifica o elemento exato onde o dedo está (corrigido para não "prender")
+        const elem = document.elementFromPoint(touch.clientX, touch.clientY);
+        const optionElem = elem?.closest('[data-index]');
+        
+        if (optionElem && optionElem.dataset && optionElem.dataset.index !== undefined) {
+            const idx = Number(optionElem.dataset.index);
             if (idx !== highlight) {
                 setHighlight(idx);
-                // Feedback Tátil nativo (Android/iOS Suportado)
+                // Feedback Tátil nativo a cada mudança de opção
                 if (navigator.vibrate) navigator.vibrate(15); 
             }
         } else {
@@ -132,9 +142,10 @@ const TouchSelect = ({ name, value, onChange, options, placeholder }) => {
     const handleEnd = () => {
         if (highlight >= 0 && options[highlight]) {
             onChange({ target: { name, value: options[highlight] } });
-            if (navigator.vibrate) navigator.vibrate([30, 50, 30]); // Vibração de confirmação
+            // Vibração mais forte ao confirmar a seleção
+            if (navigator.vibrate) navigator.vibrate([30, 50, 30]); 
+            setIsOpen(false);
         }
-        setIsOpen(false);
         setHighlight(-1);
     };
 
@@ -148,23 +159,29 @@ const TouchSelect = ({ name, value, onChange, options, placeholder }) => {
             {isOpen && (
                 <div className="fixed inset-0 z-[120] flex items-end justify-center bg-slate-900/60 backdrop-blur-sm" onClick={() => setIsOpen(false)}>
                     <div 
-                        className="w-full max-w-md bg-white rounded-t-[2rem] p-6 pb-12 max-h-[75vh] overflow-y-auto shadow-2xl"
+                        className="w-full max-w-md bg-white rounded-t-[2rem] p-6 pb-12 max-h-[85vh] overflow-y-auto shadow-2xl"
                         onClick={e => e.stopPropagation()}
-                        onTouchMove={handleMove}
-                        onTouchEnd={handleEnd}
                     >
                         <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-6"></div>
                         <p className="text-[10px] font-black text-slate-400 mb-4 uppercase text-center tracking-widest">Deslize ou Toque para Escolher</p>
                         
-                        <div className="space-y-2">
+                        <div 
+                            className="space-y-1.5 relative"
+                            onTouchMove={handleMove}
+                            onTouchEnd={handleEnd}
+                            onTouchCancel={handleEnd}
+                            style={{ touchAction: 'none' }} // Fundamental: bloqueia o scroll da tela inteira ao deslizar o dedo aqui
+                        >
                             {options.map((opt, i) => (
                                 <div 
                                     key={opt} 
                                     data-index={i}
+                                    onTouchStart={() => { setHighlight(i); if (navigator.vibrate) navigator.vibrate(15); }}
                                     onClick={() => { onChange({ target: { name, value: opt }}); setIsOpen(false); }}
-                                    className={`p-4 rounded-2xl transition-all duration-200 cursor-pointer border ${value === opt || highlight === i ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/30 scale-[1.03] border-emerald-400' : 'bg-slate-50 text-slate-700 border-slate-100 hover:bg-slate-100'}`}
+                                    className={`p-3.5 rounded-xl transition-all duration-100 cursor-pointer border ${value === opt || highlight === i ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/30 scale-[1.03] border-emerald-400 z-10 relative' : 'bg-slate-50 text-slate-700 border-slate-100 hover:bg-slate-100'}`}
                                 >
-                                    <span className="text-sm font-bold uppercase">{opt}</span>
+                                    {/* pointer-events-none garante que o touch é sempre lido na div principal e nunca encrava no texto */}
+                                    <span className="text-xs font-bold uppercase pointer-events-none">{opt}</span>
                                 </div>
                             ))}
                         </div>
@@ -201,8 +218,14 @@ const SwipeableEntry = ({ entry, onEdit, onDelete, currentAdmin, adminGeneralFil
     };
     
     const handleEnd = () => {
-        if (offsetX > 70) onEdit(entry); // Swipe Direita (Editar)
-        else if (offsetX < -70) onDelete(entry); // Swipe Esquerda (Excluir)
+        if (offsetX > 70) {
+            onEdit(entry); // Swipe Direita (Editar)
+            if (navigator.vibrate) navigator.vibrate(20);
+        }
+        else if (offsetX < -70) {
+            onDelete(entry); // Swipe Esquerda (Excluir)
+            if (navigator.vibrate) navigator.vibrate(20);
+        }
         setOffsetX(0); // Volta à posição original
     };
 
@@ -218,12 +241,12 @@ const SwipeableEntry = ({ entry, onEdit, onDelete, currentAdmin, adminGeneralFil
                 </div>
             </div>
 
-            {/* Cartão de Superfície */}
+            {/* Cartão de Superfície (com touchAction: pan-y para permitir scroll vertical mas apanhar os swipes horizontais) */}
             <div 
                 onTouchStart={handleStart}
                 onTouchMove={handleMove}
                 onTouchEnd={handleEnd}
-                style={{ transform: `translateX(${offsetX}px)`, transition: offsetX === 0 ? 'transform 0.3s ease' : 'none' }}
+                style={{ transform: `translateX(${offsetX}px)`, transition: offsetX === 0 ? 'transform 0.3s ease' : 'none', touchAction: 'pan-y' }}
                 className="relative bg-white p-4 rounded-2xl shadow-sm flex justify-between items-center z-10"
             >
                 <div className="flex-1 min-w-0 pr-2 pointer-events-none">
@@ -531,6 +554,8 @@ export default function App() {
         try {
             await addDoc(collection(db, COLLECTION_NAME), { ...formData, userId: user.uid, createdAt: new Date() });
             setFormData({ ...formData, doctorName: '', crm: '', value: '', observations: '', category: '', actionType: '' }); 
+            
+            if (navigator.vibrate) navigator.vibrate([30, 50, 30, 50, 30]); // Vibração de Sucesso dupla
             setShowSuccessPopup(true);
             setTimeout(() => { setShowSuccessPopup(false); }, 3500); 
             setView('history');
@@ -548,6 +573,7 @@ export default function App() {
                 team, requesterName, doctorName, value, crm, category, actionType, observations: editingEntry.observations || ''
             });
             setEditingEntry(null);
+            if (navigator.vibrate) navigator.vibrate([30, 50, 30]); 
             notify("Lançamento atualizado com sucesso!");
         } catch(err) {
             notify("Erro ao atualizar a base de dados.", "error");
@@ -560,6 +586,7 @@ export default function App() {
             setEntries(prev => prev.filter(e => e.id !== deleteTarget.id));
             await deleteDoc(doc(db, COLLECTION_NAME, deleteTarget.id));
             setDeleteTarget(null);
+            if (navigator.vibrate) navigator.vibrate(50);
             notify("LANÇAMENTO REMOVIDO.");
         } catch (err) { notify("Erro ao excluir.", "error"); }
     };
@@ -924,7 +951,7 @@ export default function App() {
                                 
                                 <div className="flex bg-slate-200 p-1.5 rounded-2xl shadow-inner text-center">
                                     <button onClick={() => setAdminTab('reports')} className={`flex-1 py-3 text-xs font-black uppercase rounded-xl transition-all ${adminTab === 'reports' ? 'bg-white text-emerald-600 shadow-xl' : 'text-slate-500 hover:text-slate-700'}`}>Relatórios</button>
-                                    <button onClick={() => setAdminTab('manage')} className={`flex-1 py-3 text-xs font-black uppercase rounded-xl transition-all ${adminTab === 'manage' ? 'bg-white text-rose-600 shadow-xl' : 'text-slate-500 hover:text-slate-700'}`}>Auditoria</button>
+                                    <button onClick={() => setAdminTab('manage')} className={`flex-1 py-3 text-xs font-black uppercase rounded-xl transition-all ${adminTab === 'manage' ? 'bg-white text-rose-600 shadow-xl' : 'text-slate-500 hover:text-slate-700'}`}>Editar / Excluir</button>
                                 </div>
 
                                 {adminTab === 'reports' ? (
@@ -1003,4 +1030,3 @@ export default function App() {
         </div>
     );
 }
-
