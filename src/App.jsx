@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, onAuthStateChanged, signInAnonymously } from 'firebase/auth';
 import { getFirestore, collection, addDoc, onSnapshot, doc, deleteDoc, updateDoc } from 'firebase/firestore';
@@ -111,42 +111,54 @@ const ADMIN_USERS = {
 const TouchSelect = ({ name, value, onChange, options, placeholder }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [highlight, setHighlight] = useState(-1);
+    const highlightRef = useRef(-1);
+    const containerRef = useRef(null);
 
-    // Evita scroll da página de fundo quando o modal do menu está aberto
     useEffect(() => {
         if (isOpen) document.body.style.overflow = 'hidden';
         else document.body.style.overflow = 'unset';
         return () => { document.body.style.overflow = 'unset'; };
     }, [isOpen]);
 
-    const handleMove = (e) => {
-        if (e.touches.length !== 1) return;
-        const touch = e.touches[0];
-        
-        // Identifica o elemento exato onde o dedo está (corrigido para não "prender")
-        const elem = document.elementFromPoint(touch.clientX, touch.clientY);
-        const optionElem = elem?.closest('[data-index]');
-        
-        if (optionElem && optionElem.dataset && optionElem.dataset.index !== undefined) {
-            const idx = Number(optionElem.dataset.index);
-            if (idx !== highlight) {
-                setHighlight(idx);
-                // Feedback Tátil nativo a cada mudança de opção
-                if (navigator.vibrate) navigator.vibrate(15); 
+    useEffect(() => {
+        const el = containerRef.current;
+        if (!el || !isOpen) return;
+
+        const handleTouchMove = (e) => {
+            // MÁGICA AQUI: Bloqueia o scroll nativo do iPhone e foca só no deslizar do dedo
+            e.preventDefault(); 
+            if (e.touches.length !== 1) return;
+            
+            const touch = e.touches[0];
+            const elem = document.elementFromPoint(touch.clientX, touch.clientY);
+            const optionElem = elem?.closest('[data-index]');
+            
+            if (optionElem && optionElem.dataset && optionElem.dataset.index !== undefined) {
+                const idx = Number(optionElem.dataset.index);
+                if (idx !== highlightRef.current) {
+                    setHighlight(idx);
+                    highlightRef.current = idx;
+                    try { if (navigator.vibrate) navigator.vibrate(15); } catch(e){}
+                }
+            } else {
+                setHighlight(-1);
+                highlightRef.current = -1;
             }
-        } else {
-            setHighlight(-1);
-        }
-    };
+        };
+
+        // { passive: false } é obrigatório no iOS para a trava (preventDefault) funcionar perfeitamente
+        el.addEventListener('touchmove', handleTouchMove, { passive: false });
+        return () => el.removeEventListener('touchmove', handleTouchMove);
+    }, [isOpen]);
 
     const handleEnd = () => {
-        if (highlight >= 0 && options[highlight]) {
-            onChange({ target: { name, value: options[highlight] } });
-            // Vibração mais forte ao confirmar a seleção
-            if (navigator.vibrate) navigator.vibrate([30, 50, 30]); 
-            setIsOpen(false);
+        if (highlightRef.current >= 0 && options[highlightRef.current]) {
+            onChange({ target: { name, value: options[highlightRef.current] } });
+            try { if (navigator.vibrate) navigator.vibrate([30, 50, 30]); } catch(e){}
         }
+        setIsOpen(false);
         setHighlight(-1);
+        highlightRef.current = -1;
     };
 
     return (
@@ -159,28 +171,30 @@ const TouchSelect = ({ name, value, onChange, options, placeholder }) => {
             {isOpen && (
                 <div className="fixed inset-0 z-[120] flex items-end justify-center bg-slate-900/60 backdrop-blur-sm" onClick={() => setIsOpen(false)}>
                     <div 
-                        className="w-full max-w-md bg-white rounded-t-[2rem] p-6 pb-12 max-h-[85vh] overflow-y-auto shadow-2xl"
+                        className="w-full max-w-md bg-white rounded-t-[2.5rem] p-5 pb-8 shadow-2xl flex flex-col max-h-[90vh]"
                         onClick={e => e.stopPropagation()}
                     >
-                        <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-6"></div>
-                        <p className="text-[10px] font-black text-slate-400 mb-4 uppercase text-center tracking-widest">Deslize ou Toque para Escolher</p>
+                        <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-4 shrink-0"></div>
+                        <p className="text-[10px] font-black text-slate-400 mb-3 uppercase text-center tracking-widest shrink-0">Deslize o dedo sem soltar</p>
                         
                         <div 
-                            className="space-y-1.5 relative"
-                            onTouchMove={handleMove}
+                            ref={containerRef}
+                            className="space-y-1 relative"
                             onTouchEnd={handleEnd}
                             onTouchCancel={handleEnd}
-                            style={{ touchAction: 'none' }} // Fundamental: bloqueia o scroll da tela inteira ao deslizar o dedo aqui
                         >
                             {options.map((opt, i) => (
                                 <div 
                                     key={opt} 
                                     data-index={i}
-                                    onTouchStart={() => { setHighlight(i); if (navigator.vibrate) navigator.vibrate(15); }}
+                                    onTouchStart={() => { 
+                                        setHighlight(i); 
+                                        highlightRef.current = i;
+                                        try{ if (navigator.vibrate) navigator.vibrate(15); }catch(e){} 
+                                    }}
                                     onClick={() => { onChange({ target: { name, value: opt }}); setIsOpen(false); }}
-                                    className={`p-3.5 rounded-xl transition-all duration-100 cursor-pointer border ${value === opt || highlight === i ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/30 scale-[1.03] border-emerald-400 z-10 relative' : 'bg-slate-50 text-slate-700 border-slate-100 hover:bg-slate-100'}`}
+                                    className={`p-3 rounded-xl transition-all duration-75 cursor-pointer border flex items-center ${value === opt || highlight === i ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/40 scale-[1.02] border-emerald-400 z-10 relative' : 'bg-slate-50 text-slate-700 border-slate-100 hover:bg-slate-100'}`}
                                 >
-                                    {/* pointer-events-none garante que o touch é sempre lido na div principal e nunca encrava no texto */}
                                     <span className="text-xs font-bold uppercase pointer-events-none">{opt}</span>
                                 </div>
                             ))}
@@ -241,7 +255,7 @@ const SwipeableEntry = ({ entry, onEdit, onDelete, currentAdmin, adminGeneralFil
                 </div>
             </div>
 
-            {/* Cartão de Superfície (com touchAction: pan-y para permitir scroll vertical mas apanhar os swipes horizontais) */}
+            {/* Cartão de Superfície */}
             <div 
                 onTouchStart={handleStart}
                 onTouchMove={handleMove}
