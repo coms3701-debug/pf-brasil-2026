@@ -5,18 +5,36 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>PF Verbas</title>
   
+  <!-- Configurações para iPhone e Android -->
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="PF Verbas">
   <meta name="application-name" content="PF Verbas">
   <meta name="theme-color" content="#0f172a">
 
-  <!-- Tailwind CSS via CDN para facilitar a configuração -->
+  <!-- Chama o Manifesto (Ícone e Tela Cheia) -->
+  <link rel="manifest" href="/manifest.json" />
+
+  <!-- Tailwind CSS para Estilos -->
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-slate-100 text-slate-900 font-sans antialiased">
   <div id="root"></div>
-  <!-- Ligação com o código React na pasta src -->
+  
+  <!-- Inicia o Aplicativo React (App.jsx via main.jsx) -->
   <script type="module" src="/src/main.jsx"></script>
+
+  <!-- Inicia o Robô Offline (Service Worker) -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').then(registration => {
+          console.log('✅ Modo Offline Ativado com sucesso!');
+        }).catch(err => {
+          console.log('❌ Erro ao ativar modo offline: ', err);
+        });
+      });
+    }
+  </script>
 </body>
 </html>
