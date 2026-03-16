@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, onAuthStateChanged, signInAnonymously } from 'firebase/auth';
-// IMPORTAÇÕES ATUALIZADAS PARA SUPORTE OFFLINE
-import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, collection, addDoc, onSnapshot, doc, deleteDoc } from 'firebase/firestore';
+import { getFirestore, collection, addDoc, onSnapshot, doc, deleteDoc } from 'firebase/firestore';
 
 // =============================================================
 // CONFIGURAÇÃO DO BANCO DE DADOS (FIREBASE GOOGLE)
@@ -19,10 +18,8 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 
-// ATIVA O MODO OFFLINE DO FIREBASE (CACHE PERSISTENTE)
-const db = initializeFirestore(app, {
-  localCache: persistentLocalCache({tabManager: persistentMultipleTabManager()})
-});
+// INICIALIZAÇÃO PADRÃO (SEM AS FUNÇÕES EXPERIMENTAIS QUE QUEBRAVAM O CÓDIGO)
+const db = getFirestore(app);
 
 const COLLECTION_NAME = 'pf_budget_oficial_2026';
 
@@ -110,12 +107,13 @@ const ADMIN_USERS = {
     "1008": { name: "GESTOR SUL", isGeneral: false, team: "DISTRITAL SUL" }
 };
 
-const App = () => {
+export default function App() {
     const [user, setUser] = useState(null);
     const [entries, setEntries] = useState([]);
     const [loading, setLoading] = useState(true);
     const [view, setView] = useState('form'); 
     const [status, setStatus] = useState({ type: '', msg: '' });
+    const [showSuccessPopup, setShowSuccessPopup] = useState(false);
     const [currentAdmin, setCurrentAdmin] = useState(null);
     const [pinInput, setPinInput] = useState('');
     const [adminTab, setAdminTab] = useState('reports'); 
@@ -159,7 +157,7 @@ const App = () => {
     }, []);
 
     // =========================================================================
-    // FIREBASE AUTH & FETCH (BLINDADO)
+    // FIREBASE AUTH & FETCH
     // =========================================================================
     useEffect(() => {
         signInAnonymously(auth).catch(() => notify("Erro de ligação", "error"));
@@ -379,7 +377,12 @@ const App = () => {
         try {
             await addDoc(collection(db, COLLECTION_NAME), { ...formData, userId: user.uid, createdAt: new Date() });
             setFormData({ ...formData, doctorName: '', crm: '', value: '', observations: '', category: '', actionType: '' }); 
-            notify("REGISTADO COM SUCESSO!");
+            
+            setShowSuccessPopup(true);
+            setTimeout(() => {
+                setShowSuccessPopup(false);
+            }, 3500); 
+            
             setView('history');
         } catch (err) { alert("Erro ao gravar: " + err.message); }
     };
@@ -423,7 +426,24 @@ const App = () => {
     return (
         <div className="min-h-screen bg-slate-100 pb-24 text-slate-900 font-sans">
             
-            {/* MODAL DE SEGURANÇA NA EXCLUSÃO */}
+            {showSuccessPopup && (
+                <div className="fixed inset-0 z-[110] flex items-center justify-center p-6 animate-in fade-in duration-300">
+                    <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-sm" onClick={() => setShowSuccessPopup(false)}></div>
+                    <div className="relative bg-white w-full max-sm:rounded-3xl rounded-[2.5rem] shadow-2xl p-8 animate-in zoom-in-95 border border-slate-100 text-center flex flex-col items-center">
+                        <div className="w-24 h-24 bg-gradient-to-br from-emerald-500 to-teal-800 rounded-[2rem] flex items-center justify-center text-white font-serif text-5xl font-bold italic shadow-[0_10px_30px_rgba(16,185,129,0.4)] mb-6">
+                            PF
+                        </div>
+                        <h3 className="text-2xl font-black text-slate-800 uppercase tracking-tight mb-2">Sucesso!</h3>
+                        <p className="text-sm font-bold text-slate-500 mb-8 uppercase tracking-wider leading-relaxed">
+                            Seu investimento foi enviado com sucesso.
+                        </p>
+                        <button onClick={() => setShowSuccessPopup(false)} className="w-full bg-emerald-50 text-emerald-600 font-black py-4 rounded-2xl active:scale-95 transition-all uppercase text-sm tracking-widest border border-emerald-100">
+                            Continuar
+                        </button>
+                    </div>
+                </div>
+            )}
+
             {deleteTarget && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 animate-in fade-in duration-200">
                     <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setDeleteTarget(null)}></div>
@@ -461,7 +481,6 @@ const App = () => {
             )}
 
             <main className="max-w-md mx-auto p-4">
-                {/* ======================= ABA NOVO ======================= */}
                 {view === 'form' && (
                     <div className="bg-white rounded-[2rem] p-7 shadow-2xl border border-slate-100 animate-in fade-in zoom-in-95">
                         <h2 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] mb-7 flex items-center gap-2">
@@ -537,7 +556,6 @@ const App = () => {
                     </div>
                 )}
 
-                {/* ======================= ABA FEED ======================= */}
                 {view === 'history' && (
                     <div className="space-y-5 animate-in slide-in-from-bottom-4 duration-500 pb-10">
                         
@@ -680,7 +698,6 @@ const App = () => {
                     </div>
                 )}
 
-                {/* ======================= ABA GESTOR ======================= */}
                 {view === 'admin' && (
                     <div className="animate-in fade-in duration-500">
                         {!currentAdmin ? (
@@ -776,5 +793,5 @@ const App = () => {
             </nav>
         </div>
     );
-};
+}
 
