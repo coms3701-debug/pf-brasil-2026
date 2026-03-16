@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, onAuthStateChanged, signInAnonymously } from 'firebase/auth';
-import { getFirestore, collection, addDoc, onSnapshot, doc, deleteDoc } from 'firebase/firestore';
+// IMPORTAÇÕES ATUALIZADAS PARA SUPORTE OFFLINE
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, collection, addDoc, onSnapshot, doc, deleteDoc } from 'firebase/firestore';
 
 // =============================================================
 // CONFIGURAÇÃO DO BANCO DE DADOS (FIREBASE GOOGLE)
@@ -17,13 +18,14 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
-const db = getFirestore(app);
+
+// ATIVA O MODO OFFLINE DO FIREBASE (CACHE PERSISTENTE)
+const db = initializeFirestore(app, {
+  localCache: persistentLocalCache({tabManager: persistentMultipleTabManager()})
+});
 
 const COLLECTION_NAME = 'pf_budget_oficial_2026';
 
-// =============================================================
-// DADOS DO NEGÓCIO (LISTAS ATUALIZADAS)
-// =============================================================
 const TEAMS = [
     "DISTRITAL RIO TOTAL", "DISTRITAL MG/ES", "DISTRITAL NNE", "DISTRITAL SPC1", "DISTRITAL SPC2",
     "DISTRITAL SPI/BSB", "DISTRITAL SPI/GNY", "DISTRITAL SUL",
@@ -426,7 +428,6 @@ const App = () => {
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 animate-in fade-in duration-200">
                     <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setDeleteTarget(null)}></div>
                     <div className="relative bg-white w-full max-sm:rounded-3xl rounded-[2.5rem] shadow-2xl p-8 animate-in zoom-in-95 border border-slate-100 text-center">
-                        {/* Como estamos sem import de ícones aqui, usamos um emoji para o modal de forma segura */}
                         <div className="text-5xl mb-4">⚠️</div>
                         <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Confirmar Exclusão?</h3>
                         <p className="text-sm text-slate-500 my-4 px-2 italic">Excluir lançamento de <strong className="text-slate-800">{deleteTarget.doctorName}</strong>?</p>
@@ -562,7 +563,7 @@ const App = () => {
                                     <h4 className="text-2xl font-black tracking-tight">R$ {Number(totalUsedFeed).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h4>
                                 </div>
                                 <div className="text-right">
-                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">Registros</p>
+                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">Registos</p>
                                     <h4 className="text-2xl font-black text-slate-300">{feedEntries.length}</h4>
                                 </div>
                             </div>
@@ -776,3 +777,4 @@ const App = () => {
         </div>
     );
 };
+
