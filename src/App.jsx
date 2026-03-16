@@ -301,6 +301,40 @@ export default function App() {
     const [deleteTarget, setDeleteTarget] = useState(null);
     const [editingEntry, setEditingEntry] = useState(null); // Estado para edição
 
+    // =========================================================================
+    // ÍCONE DINÂMICO PWA (IPHONE)
+    // =========================================================================
+    useEffect(() => {
+        try {
+            const canvas = document.createElement('canvas');
+            canvas.width = 1024; canvas.height = 1024;
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+                const grad = ctx.createLinearGradient(0, 0, 1024, 1024);
+                grad.addColorStop(0, '#059669'); // emerald-600
+                grad.addColorStop(1, '#10b981'); // emerald-500
+                ctx.fillStyle = grad;
+                ctx.beginPath(); 
+                ctx.roundRect(0, 0, 1024, 1024, 200); 
+                ctx.fill();
+                ctx.fillStyle = 'white'; 
+                ctx.font = 'italic bold 550px serif';
+                ctx.textAlign = 'center'; 
+                ctx.textBaseline = 'middle';
+                ctx.fillText('PF', 512, 512 + 40);
+                const iconUrl = canvas.toDataURL('image/png');
+                
+                let link = document.querySelector('link[rel="apple-touch-icon"]');
+                if (!link) {
+                    link = document.createElement('link');
+                    link.rel = 'apple-touch-icon';
+                    document.head.appendChild(link);
+                }
+                link.href = iconUrl;
+            }
+        } catch(e) {}
+    }, []);
+
     const [teamBudgets, setTeamBudgets] = useState(() => {
         try { return JSON.parse(localStorage.getItem('pf_team_budgets')) || {}; } 
         catch (e) { return {}; }
