@@ -1,513 +1,778 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { auth, db } from './firebase';
-import { onAuthStateChanged, signInAnonymously } from 'firebase/auth';
-import { collection, addDoc, onSnapshot, doc, deleteDoc } from 'firebase/firestore';
-import { 
-  User, Stethoscope, Tag, Activity, MessageSquare, Send, Download, 
-  Trash2, Plus, ListFilter, Wallet, CheckCircle2, AlertCircle, 
-  Briefcase, TrendingUp, Globe, ShieldAlert, BarChart3, Lock, Users, PieChart, MapPin
-} from 'lucide-react';
+import { initializeApp } from 'firebase/app';
+import { getAuth, onAuthStateChanged, signInAnonymously } from 'firebase/auth';
+import { getFirestore, collection, addDoc, onSnapshot, doc, deleteDoc } from 'firebase/firestore';
 
-const COLLECTION_NAME = 'pf_global_budget'; // Coleção de produção
+// =============================================================
+// CONFIGURAÇÃO DO BANCO DE DADOS (FIREBASE GOOGLE)
+// =============================================================
+const firebaseConfig = {
+    apiKey: "AIzaSyBSXiZWea-cXvztxKv28YggNOJioqsBobU",
+    authDomain: "pf-verbas.firebaseapp.com",
+    projectId: "pf-verbas",
+    storageBucket: "pf-verbas.firebasestorage.app",
+    messagingSenderId: "1048653186555",
+    appId: "1:1048653186555:web:2b7945d5e1cf3998b5f75e"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+const COLLECTION_NAME = 'pf_budget_oficial_2026';
 
 const TEAMS = [
-  "Diretoria (Matriz)",
-  "Gerente Nacional de VM",
-  "Gerente Nacional de Execução",
-  "Distrital Sul",
-  "Distrital São Paulo 1",
-  "Distrital São Paulo 2",
-  "Distrital SPI GO",     
-  "Distrital SPI BSB",    
-  "Distrital Rio Total",
-  "Distrital MG/ES",
-  "Distrital NNE"
+    "DISTRITAL RIO TOTAL", "DISTRITAL MG/ES", "DISTRITAL NNE", "DISTRITAL SPC1", "DISTRITAL SPC2",
+    "DISTRITAL SPI/BSB", "DISTRITAL SPI/GNY", "DISTRITAL SUL",
+    "GERENTE NACIONAL DE VISITAÇÃO MÉDICA", "GERENTE NACIONAL DE EXECUÇÃO", "DIRETORIA (MATRIZ)"
 ];
 
-const ADMIN_USERS = {
-  "8888": { name: "Administrador", isGeneral: true, team: "Diretoria (Matriz)" },
-  "8889": { name: "Nacional de VM", isGeneral: true, team: "Gerente Nacional de VM" },
-  "8890": { name: "Nacional de Execução", isGeneral: true, team: "Gerente Nacional de Execução" },
-  "1001": { name: "Gestor Sul", isGeneral: false, team: "Distrital Sul" },
-  "1002": { name: "Gestor SP 1", isGeneral: false, team: "Distrital São Paulo 1" },
-  "1003": { name: "Gestor SP 2", isGeneral: false, team: "Distrital São Paulo 2" },
-  "1004": { name: "Gestor SPI GO", isGeneral: false, team: "Distrital SPI GO" },
-  "1005": { name: "Gestor SPI BSB", isGeneral: false, team: "Distrital SPI BSB" },
-  "1006": { name: "Gestor Rio Total", isGeneral: false, team: "Distrital Rio Total" },
-  "1007": { name: "Gestor MG/ES", isGeneral: false, team: "Distrital MG/ES" },
-  "1008": { name: "Gestor NNE", isGeneral: false, team: "Distrital NNE" }
+const REPRESENTATIVES = {
+    "DISTRITAL RIO TOTAL": [
+        "CARLOS OTAVIO", "LIVIA NUNES DO AMARAL", "GUSTAVO GOMES DE ARAGAO PEDRA E CAL", 
+        "VALERIA DIAS DA COSTA", "THAIS SANTANNA RIBEIRO", "CARLOS EDUARDO DO NASCIMENTO SOARES",
+        "FERNANDA DE JESUS NASCIMENTO", "SIMONE LIMA DE CARVALHO", "FELIPE GOMES",
+        "ARTHUR MARILAC FERREIRA", "ELIZABETH LIMA DA SILVA", "CARINA CARVALHO DIAS DE AMORIM",
+        "ROSIMERE MARIA DA SILVA FALCAO", "DEBORAH DE ALMEIDA LEITE PINTO DE LACERDA",
+        "ISIS DE OLIVEIRA ALVES", "PATRICIA MEIRE DE SOUZA IAMIM SILVA"
+    ],
+    "DISTRITAL MG/ES": [
+        "CALEBE MIRANDA WANDERLEY", "SIMONE SOUSA DA SILVA GENOVEZ", "HELOISA DE BARROS",
+        "MARSEILLE COSTA DE CARVALHO", "JESSICA KAROLINE MOREIRA MARCELINO", "AMANDA DE OLIVEIRA MOURA",
+        "IZABELA SALES ROCHA DELUCCA", "PAULO MARCIO TOFANI DE MELLO JUNIOR", "KENIA OLIVEIRA CANHESTRO",
+        "KELLY CRISTINA PEREIRA DE ARAUJO"
+    ],
+    "DISTRITAL NNE": [
+        "SUELLEN VASCONCELOS", "LEILA MARIA BRIZENO ALVES SETUBAL", "JOSE BERNARDO SOUZA SILVA OLIVEIRA",
+        "FERNANDO DA SILVA FORTES DA COSTA JUNIOR", "ANA ROSA FERREIRA DE MELO VENTURA",
+        "RICARDO JOSE COELHO DE ALBUQUERQUE", "MARCIA CATERINE MELO LIMA DA ROCHA",
+        "FABIANA CRISTINA PINTO TETI MAGALHAES DE MORAES", "FLAVIA MARIA CAVALCANTI MADUREIRA",
+        "RODRIGO DE OLIVEIRA WANDERLEY", "KALIANNE FELIX", "LUIS PINHEIRO", 
+        "JANAINA BEMMUYAL PARENTE SANTOS", "SANDRINE AGNES LUCIE YOUST"
+    ],
+    "DISTRITAL SPC1": [
+        "SIDNEI DE SANTIS", "VAGO VM", "PAULA NERY ARAGAO", "VALDIRENE COSME DA CONCEICAO DE FLOR",
+        "KARINA PEREIRA SILVA ACTIS", "RAFAEL MENDES PEREIRA", "MONIQUE CAROLINA MARTINS GONCALVES",
+        "ROBERTA SALES GADELHA", "SHEILA SANTANA FULNAZARI", "GRAZIELA VICENTE TORRECILLAS",
+        "PAMELA ARAUJO DA COSTA"
+    ],
+    "DISTRITAL SPC2": [
+        "CHRISTIANE RODRIGUES", "SILVIA REGINA LAZINHO", "GISELE MAKUL BIANCO", 
+        "MARCEL OLMO FERNANDES BRANCO", "LUCIENE DE SOUZA", "GISLAINE MONTINI BIZINOTTI",
+        "KARINA CAVALCANTI", "AMANDA CARDOSO SANTANA", "VAGO VM", "FLAVIA LUIZA CARDOSO LIUTTI",
+        "GABRIELA ARAUJO DE PIERI ZAMPIERI", "NIVALDO SABINO", "VANESSA GARCIA DE OLIVEIRA",
+        "SEBASTIAO ARAUJO ALMEIDA"
+    ],
+    "DISTRITAL SPI/BSB": [
+        "CARLOS DIAS", "LUCIANA ARAUJO DE OLIVEIRA CAMPOS", "LARISSA ALMEIDA FERNANDES",
+        "MARIANA LOBO MOREIRA", "LUCILIA CIBELE DE OLIVEIRA", "GELIANE DE LIMA",
+        "KARINA APARECIDA PADILHA MOTA", "CRISTIANO CARVALHO DO NASCIMENTO",
+        "DOUGLAS RODRIGO MUNHOZ DOMINGOS FIOCHI", "ELIS CRISTINA FURQUIM SILVA",
+        "BRUNO CAETANO FELIX", "CLAYLTON DE SOUZA", "KELLY FABIANE DA SILVA"
+    ],
+    "DISTRITAL SPI/GNY": [
+        "JACQUELINE MENEZES", "LINDA LUCIA DE SOUSA ALVES OLIVEIRA", "LADY MARY DE SOUZA ALMEIDA LINHARES",
+        "PAOLA FERNANDA DA SILVA MOSCOSO DE BARROS", "VERA ALICE BEVEVINO DIAS DE MORAES RIGHETI",
+        "CLARISSA GUTTIERREZ", "SILVIA HILARIO SANTOS", "GIOVANA SALAB DEPOLLI",
+        "ARYADINE CARDOSO DE SOUZA", "ANTONIO MARCOS SHIMAZAKI DA SILVA", "DANIEL STEFANI DO NASCIMENTO"
+    ],
+    "DISTRITAL SUL": [
+        "MARIANE GONCALVES", "LIEDER VARELA DIAS", "IZADORA GIMENES QUEVEDO",
+        "TATIANA RODRIGUES DA FONSECA", "MEIRE TEREZINHA LEMES FERNANDES", "LAURO FERREIRA JUNIOR",
+        "JULIANA STEFANIE OLIVEIRA", "THIAGO TOMAZZONI FERRARI", "TATIANE FERRARI", "DANNY MELO PEREIRA"
+    ],
+    "GERENTE NACIONAL DE VISITAÇÃO MÉDICA": ["BRUNO JORGE"],
+    "GERENTE NACIONAL DE EXECUÇÃO": ["GUSTAVO LIMA"],
+    "DIRETORIA (MATRIZ)": ["CARLOS OTAVIO"]
 };
 
-const categories = ['CAT 1', 'CAT 2', 'CAT 3', 'CAT 4'];
-const actionTypes = ['Dias de produto', 'Presente', 'Refeição', 'Congresso'];
+const ACTION_TYPES = [
+    'DIAS DE PRODUTO', 'PRESENTE', 'REFEIÇÃO', 'CONGRESSOS', 
+    'ORGANIZAÇÃO DE AMOSTRAS', 'MINI MEETING', 'EVENTOS', 'COMPRA DE ORIGINAIS'
+];
+const CATEGORIES = ['CAT 1', 'CAT 2', 'CAT 3', 'CAT 4'];
+
+const ADMIN_USERS = {
+    "8888": { name: "CARLOS OTÁVIO", isGeneral: true, team: "DIRETORIA (MATRIZ)" },
+    "1001": { name: "GESTOR RIO", isGeneral: false, team: "DISTRITAL RIO TOTAL" },
+    "1002": { name: "GESTOR MG/ES", isGeneral: false, team: "DISTRITAL MG/ES" },
+    "1003": { name: "GESTOR NNE", isGeneral: false, team: "DISTRITAL NNE" },
+    "1004": { name: "GESTOR SPC1", isGeneral: false, team: "DISTRITAL SPC1" },
+    "1005": { name: "GESTOR SPC2", isGeneral: false, team: "DISTRITAL SPC2" },
+    "1006": { name: "GESTOR SPI/BSB", isGeneral: false, team: "DISTRITAL SPI/BSB" },
+    "1007": { name: "GESTOR SPI/GNY", isGeneral: false, team: "DISTRITAL SPI/GNY" },
+    "1008": { name: "GESTOR SUL", isGeneral: false, team: "DISTRITAL SUL" }
+};
 
 const App = () => {
-  const [user, setUser] = useState(null);
-  const [entries, setEntries] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [view, setView] = useState('form'); 
-  const [status, setStatus] = useState({ type: '', msg: '' });
-  
-  const [currentAdmin, setCurrentAdmin] = useState(null);
-  const [pinInput, setPinInput] = useState('');
-  const [adminTab, setAdminTab] = useState('reports'); 
-  const [adminGeneralFilter, setAdminGeneralFilter] = useState('ALL');
+    const [user, setUser] = useState(null);
+    const [entries, setEntries] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [view, setView] = useState('form'); 
+    const [status, setStatus] = useState({ type: '', msg: '' });
+    const [currentAdmin, setCurrentAdmin] = useState(null);
+    const [pinInput, setPinInput] = useState('');
+    const [adminTab, setAdminTab] = useState('reports'); 
+    const [adminGeneralFilter, setAdminGeneralFilter] = useState('ALL');
+    const [deleteTarget, setDeleteTarget] = useState(null);
 
-  const [formData, setFormData] = useState({
-    team: localStorage.getItem('pf_last_team') || '',
-    requesterName: localStorage.getItem('pf_last_requester') || '',
-    doctorName: '',
-    crm: '',
-    category: '',
-    actionType: '',
-    value: '',
-    observations: ''
-  });
-
-  const notify = useCallback((msg, type = 'success') => {
-    setStatus({ type, msg });
-    if (type !== 'error') setTimeout(() => setStatus({ type: '', msg: '' }), 3000);
-  }, []);
-
-  // Auth e Ícone Dinâmico
-  useEffect(() => {
-    const initAuth = async () => {
-      try {
-        await signInAnonymously(auth);
-      } catch (err) { 
-        console.error(err);
-        notify('Falha de Autenticação', 'error'); 
-      }
+    const [budgetCeiling, setBudgetCeilingState] = useState(() => {
+        try { return localStorage.getItem('pf_budget_ceiling') || ''; } catch(e) { return ''; }
+    });
+    
+    const setBudgetCeiling = (val) => {
+        setBudgetCeilingState(val);
+        try { localStorage.setItem('pf_budget_ceiling', val); } catch(e) {}
     };
-    initAuth();
-    const unsubscribe = onAuthStateChanged(auth, setUser);
 
-    // Gerar ícone
-    try {
-      const canvas = document.createElement('canvas');
-      canvas.width = 1024; canvas.height = 1024;
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        const gradient = ctx.createLinearGradient(0, 0, 1024, 1024);
-        gradient.addColorStop(0, '#064e3b'); 
-        gradient.addColorStop(1, '#10b981'); 
-        ctx.fillStyle = gradient;
-        ctx.fillRect(0, 0, 1024, 1024);
-        ctx.fillStyle = '#ffffff'; 
-        ctx.font = 'italic bold 480px serif';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('PF', 512, 512 + 40);
-        const iconUrl = canvas.toDataURL('image/png');
-        let linkApple = document.querySelector('link[rel="apple-touch-icon"]');
-        if (!linkApple) {
-          linkApple = document.createElement('link'); 
-          linkApple.rel = 'apple-touch-icon'; 
-          document.head.appendChild(linkApple);
+    const [teamBudgets, setTeamBudgets] = useState(() => {
+        try { return JSON.parse(localStorage.getItem('pf_team_budgets')) || {}; } catch (e) { return {}; }
+    });
+
+    const [formData, setFormData] = useState(() => {
+        let t = '', r = '';
+        try {
+            t = localStorage.getItem('pf_user_team') || '';
+            r = localStorage.getItem('pf_user_name') || '';
+        } catch(e) {}
+        return {
+            team: t, requesterName: r, doctorName: '', crm: '', category: '', actionType: '', value: '', observations: ''
+        };
+    });
+
+    useEffect(() => {
+        try {
+            localStorage.setItem('pf_user_team', formData.team);
+            localStorage.setItem('pf_user_name', formData.requesterName);
+        } catch (e) {}
+    }, [formData.team, formData.requesterName]);
+
+    // Ícone Dinâmico
+    useEffect(() => {
+        try {
+            const canvas = document.createElement('canvas');
+            canvas.width = 1024; canvas.height = 1024;
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+                const grad = ctx.createLinearGradient(0, 0, 1024, 1024);
+                grad.addColorStop(0, '#059669'); grad.addColorStop(1, '#10b981');
+                ctx.fillStyle = grad;
+                ctx.beginPath(); ctx.roundRect(0, 0, 1024, 1024, 200); ctx.fill();
+                ctx.fillStyle = 'white'; ctx.font = 'italic bold 550px serif';
+                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillText('PF', 512, 512 + 40);
+                const iconUrl = canvas.toDataURL('image/png');
+                let link = document.querySelector('link[rel="apple-touch-icon"]') || document.createElement('link');
+                link.rel = 'apple-touch-icon'; link.href = iconUrl; document.head.appendChild(link);
+            }
+        } catch(e) {}
+    }, []);
+
+    const notify = useCallback((msg, type = 'success') => {
+        setStatus({ type, msg });
+        setTimeout(() => setStatus({ type: '', msg: '' }), 4000);
+    }, []);
+
+    // Firebase Login 
+    useEffect(() => {
+        signInAnonymously(auth).catch(() => notify("Erro de ligação", "error"));
+        return onAuthStateChanged(auth, setUser);
+    }, [notify]);
+
+    // Firebase Data Fetch 
+    useEffect(() => {
+        if (!user) return;
+        setLoading(true);
+        const colRef = collection(db, COLLECTION_NAME);
+        const unsubscribe = onSnapshot(colRef, (snapshot) => {
+            try {
+                const data = snapshot.docs.map(doc => {
+                    const d = doc.data();
+                    let date = new Date();
+                    if (d.createdAt) {
+                        if (typeof d.createdAt.toDate === 'function') {
+                            date = d.createdAt.toDate();
+                        } else {
+                            date = new Date(d.createdAt);
+                        }
+                    }
+                    return { id: doc.id, ...d, createdAt: date };
+                });
+                setEntries([...data].sort((a, b) => b.createdAt - a.createdAt));
+                setLoading(false);
+            } catch (e) {
+                console.error(e);
+                setLoading(false);
+            }
+        });
+        return () => unsubscribe();
+    }, [user]);
+
+    const parseCurrency = useCallback((valStr) => {
+        if (!valStr) return 0;
+        return parseFloat(String(valStr).replace(/\./g, '').replace(',', '.')) || 0;
+    }, []);
+
+    const formatDate = (dateObj) => {
+        try {
+            if (dateObj && typeof dateObj.toLocaleDateString === 'function') {
+                return dateObj.toLocaleDateString('pt-BR');
+            }
+            return '';
+        } catch (e) { return ''; }
+    };
+
+    const formatValueInput = (val) => {
+        let v = String(val || "").replace(/\D/g, "");
+        return (Number(v) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    };
+
+    const currentFeedTeam = useMemo(() => {
+        if (currentAdmin) {
+            if (currentAdmin.isGeneral) {
+                if (adminGeneralFilter === 'ALL') return 'ALL';
+                if (adminGeneralFilter === 'MINE') return currentAdmin.team;
+                return adminGeneralFilter;
+            }
+            return currentAdmin.team;
         }
-        linkApple.href = iconUrl;
-      }
-    } catch(e) {}
+        return formData.team; 
+    }, [currentAdmin, adminGeneralFilter, formData.team]);
 
-    return () => unsubscribe();
-  }, [notify]);
+    const displayBudgetCeiling = useMemo(() => {
+        try {
+            if (currentFeedTeam === 'ALL') {
+                const total = TEAMS.reduce((acc, team) => acc + parseCurrency(teamBudgets[team] || "0"), 0);
+                return total > 0 ? total.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '';
+            }
+            return teamBudgets[currentFeedTeam] || '';
+        } catch(e) { return ''; }
+    }, [currentFeedTeam, teamBudgets, parseCurrency]);
 
-  // Leitura Firestore
-  useEffect(() => {
-    if (!user) return;
-    setLoading(true); 
-    const colRef = collection(db, COLLECTION_NAME);
-    const unsubscribe = onSnapshot(colRef, 
-      (snapshot) => {
-        const data = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data(),
-          createdAt: doc.data().createdAt?.toDate() || new Date() 
-        }));
-        setEntries([...data].sort((a, b) => b.createdAt - a.createdAt));
-        setLoading(false);
-      }, 
-      (err) => {
-        console.error(err);
-        setLoading(false);
-      }
-    );
-    return () => unsubscribe();
-  }, [user]);
+    const handleBudgetChange = (val) => {
+        if (!currentFeedTeam || currentFeedTeam === 'ALL') return;
+        const newBudgets = { ...teamBudgets, [currentFeedTeam]: val };
+        setTeamBudgets(newBudgets);
+        try { localStorage.setItem('pf_team_budgets', JSON.stringify(newBudgets)); } catch(e) {}
+    };
 
-  // Filtros Gestão
-  const adminFilteredEntries = useMemo(() => {
-    if (!currentAdmin) return [];
-    if (currentAdmin.isGeneral) {
-      if (adminGeneralFilter === 'ALL') return entries;
-      if (adminGeneralFilter === 'MINE') return entries.filter(e => e.team === currentAdmin.team);
-      return entries.filter(e => e.team === adminGeneralFilter);
-    } 
-    return entries.filter(e => e.team === currentAdmin.team);
-  }, [entries, currentAdmin, adminGeneralFilter]);
+    const filteredEntriesAdmin = useMemo(() => {
+        try {
+            if (!currentAdmin) return [];
+            if (currentAdmin.isGeneral) {
+                if (adminGeneralFilter === 'MINE') return entries.filter(e => e.team === currentAdmin.team);
+                if (adminGeneralFilter !== 'ALL') return entries.filter(e => e.team === adminGeneralFilter);
+                return entries;
+            }
+            return entries.filter(e => e.team === currentAdmin.team);
+        } catch(e) { return []; }
+    }, [entries, currentAdmin, adminGeneralFilter]);
 
-  const parseCurrency = useCallback((valStr) => {
-    if (!valStr) return 0;
-    return parseFloat(valStr.toString().replace(/\./g, '').replace(',', '.')) || 0;
-  }, []);
+    const feedEntries = useMemo(() => {
+        try {
+            if (currentAdmin) return filteredEntriesAdmin; 
+            if (formData.requesterName) return entries.filter(e => e.requesterName === formData.requesterName);
+            return []; 
+        } catch(e) { return []; }
+    }, [entries, currentAdmin, filteredEntriesAdmin, formData.requesterName]);
 
-  const totalInvested = useMemo(() => adminFilteredEntries.reduce((acc, curr) => acc + parseCurrency(curr.value), 0), [adminFilteredEntries, parseCurrency]);
-
-  const statsByUser = useMemo(() => {
-    const groups = adminFilteredEntries.reduce((acc, curr) => {
-      const name = curr.requesterName || "Não Identificado";
-      if (!acc[name]) acc[name] = { total: 0, count: 0 };
-      acc[name].total += parseCurrency(curr.value);
-      acc[name].count += 1;
-      return acc;
-    }, {});
-    return Object.entries(groups).map(([name, data]) => ({ name, ...data })).sort((a, b) => b.total - a.total);
-  }, [adminFilteredEntries, parseCurrency]);
-
-  const statsByType = useMemo(() => {
-    const groups = adminFilteredEntries.reduce((acc, curr) => {
-      const type = curr.actionType || "Outros";
-      if (!acc[type]) acc[type] = { total: 0, count: 0 };
-      acc[type].total += parseCurrency(curr.value);
-      acc[type].count += 1;
-      return acc;
-    }, {});
-    return Object.entries(groups).map(([name, data]) => ({ name, ...data })).sort((a, b) => b.total - a.total);
-  }, [adminFilteredEntries, parseCurrency]);
-
-  const maxUserTotal = statsByUser.length > 0 ? statsByUser[0].total : 1;
-  const maxTypeTotal = statsByType.length > 0 ? statsByType[0].total : 1;
-
-  // Handlers
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    if (name === 'value') {
-      let val = value.replace(/\D/g, "");
-      val = (Number(val) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-      setFormData(prev => ({ ...prev, [name]: val }));
-    } else {
-      setFormData(prev => ({ ...prev, [name]: value }));
-    }
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!user) return notify("Aguarde a ligação ao servidor", "error");
+    const totalUsedFeed = useMemo(() => {
+        try { return feedEntries.reduce((acc, curr) => acc + parseCurrency(curr.value), 0); } 
+        catch(e) { return 0; }
+    }, [feedEntries, parseCurrency]);
     
-    const { team, requesterName, doctorName, crm, category, actionType, value, observations } = formData;
-    if (!team || !requesterName || !doctorName || !crm || !category || !actionType || !value) {
-      return notify("Preencha todos os campos obrigatórios.", "error");
-    }
-    
-    try {
-      await addDoc(collection(db, COLLECTION_NAME), {
-        ...formData, 
-        userId: user.uid, 
-        createdAt: new Date(),
-      });
-      localStorage.setItem('pf_last_team', team);
-      localStorage.setItem('pf_last_requester', requesterName);
-      setFormData({ team, requesterName, doctorName: '', crm: '', category: '', actionType: '', value: '', observations: '' });
-      notify("Lançamento efetuado!");
-      setView('history');
-    } catch (err) { 
-      notify("Erro ao gravar.", "error"); 
-    }
-  };
+    const budgetBalance = useMemo(() => {
+        try { return parseCurrency(displayBudgetCeiling) - totalUsedFeed; } 
+        catch(e) { return 0; }
+    }, [displayBudgetCeiling, totalUsedFeed]);
 
-  const deleteEntry = async (id, isForceDelete = false) => {
-    if (!isForceDelete && !window.confirm("Tem a certeza que deseja cancelar?")) return;
-    try {
-      await deleteDoc(doc(db, COLLECTION_NAME, id));
-      notify("Registo removido");
-    } catch (err) { 
-      notify("Erro ao remover", "error"); 
-    }
-  };
+    const exportToCSV = () => {
+        try {
+            const dataToExport = currentAdmin ? filteredEntriesAdmin : feedEntries;
+            if (dataToExport.length === 0) return notify("Não existem dados para exportar.", "error");
 
-  const exportToExcel = () => {
-    const dataToExport = currentAdmin ? adminFilteredEntries : entries.filter(e => e.team === formData.team);
-    if (dataToExport.length === 0) return notify("Sem dados para exportar", "error");
-    
-    const headers = ["Data", "Equipe", "Solicitante", "Médico", "CRM", "Categoria", "Tipo", "Valor", "Observações"];
-    const csvContent = [headers.join(";"), ...dataToExport.map(e => [
-      e.createdAt.toLocaleDateString(), e.team || "-", e.requesterName, e.doctorName, e.crm, e.category, e.actionType, e.value, (e.observations || "").replace(/;/g, ' ')
-    ].join(";"))].join("\n");
-    
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(new Blob(["\ufeff" + csvContent], { type: 'text/csv;charset=utf-8;' }));
-    const fileNameScope = currentAdmin && currentAdmin.isGeneral && adminGeneralFilter === 'ALL' ? 'Geral_Brasil' : (currentAdmin ? currentAdmin.team.replace(/\s+/g, '_') : 'Geral');
-    link.download = `PF_Relatorio_${fileNameScope}_${new Date().toISOString().split('T')[0]}.csv`;
-    link.click();
-  };
+            const headers = ["Data", "Estrutura", "Solicitante", "Medico/Destinatario", "CRM", "Categoria", "Acao", "Valor", "Observacoes"];
+            const rows = dataToExport.map(e => {
+                const date = formatDate(e.createdAt);
+                const obs = String(e.observations || "").replace(/"/g, '""').replace(/\n/g, ' '); 
+                return [`"${date}"`,`"${e.team || ''}"`,`"${e.requesterName || ''}"`,`"${e.doctorName || ''}"`,`"${e.crm || ''}"`,`"${e.category || ''}"`,`"${e.actionType || ''}"`,`"${e.value || ''}"`,`"${obs}"`].join(";");
+            });
 
-  const handleAdminLogin = (e) => {
-    e.preventDefault();
-    const adminRole = ADMIN_USERS[pinInput];
-    if (adminRole) {
-      setCurrentAdmin(adminRole);
-      setPinInput('');
-      setAdminGeneralFilter('ALL'); 
-      notify(`Bem-vindo, ${adminRole.name}`);
-    } else {
-      notify("PIN Incorreto", "error");
-      setPinInput('');
-    }
-  };
+            const csvString = [headers.join(";"), ...rows].join("\n");
+            const blob = new Blob(["\uFEFF" + csvString], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.setAttribute("href", url);
+            link.setAttribute("download", `PF_Relatorio_${new Date().toISOString().split('T')[0]}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+            notify("Exportação concluída!");
+        } catch (err) { notify("Falha ao exportar", "error"); }
+    };
 
-  const logoutAdmin = () => {
-    setCurrentAdmin(null);
-    setView('form');
-    notify("Sessão terminada");
-  };
+    const feedStatsByRep = useMemo(() => {
+        try {
+            const groups = feedEntries.reduce((acc, curr) => {
+                const name = String(curr.requesterName || "NÃO IDENTIFICADO");
+                if (!acc[name]) acc[name] = { total: 0, count: 0 };
+                acc[name].total += parseCurrency(curr.value);
+                acc[name].count += 1;
+                return acc;
+            }, {});
+            return Object.entries(groups).map(([name, data]) => ({ name, ...data })).sort((a, b) => b.total - a.total);
+        } catch(e) { return []; }
+    }, [feedEntries, parseCurrency]);
 
-  return (
-    <div className="min-h-screen bg-slate-100 text-slate-900 font-sans pb-28 selection:bg-emerald-200">
-      <header className="sticky top-0 z-50 bg-slate-900 border-b border-slate-800 px-5 py-4 shadow-xl">
-        <div className="max-w-md mx-auto flex justify-between items-center">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-teal-800 rounded-xl flex items-center justify-center text-white font-serif text-xl font-bold italic shadow-[0_0_15px_rgba(16,185,129,0.3)] border border-emerald-400/20">
-              PF
-            </div>
-            <div>
-              <h1 className="text-lg font-bold text-white leading-none tracking-tight">Pierre Fabre</h1>
-              <span className="text-[10px] uppercase tracking-[0.2em] text-emerald-400 font-bold flex items-center gap-1 mt-0.5">
-                {currentAdmin && view === 'admin' ? <ShieldAlert size={10} /> : <Globe size={10} />}
-                {currentAdmin && view === 'admin' ? (currentAdmin.isGeneral ? 'Admin Brasil' : 'Gestor Regional') : 'Corporate Brasil'}
-              </span>
-            </div>
-          </div>
-          <button onClick={exportToExcel} className="p-2.5 bg-slate-800 text-emerald-400 rounded-xl hover:bg-slate-700 transition-all border border-slate-700 active:scale-95">
-            <Download size={20} />
-          </button>
-        </div>
-      </header>
+    const feedStatsByAction = useMemo(() => {
+        try {
+            const groups = feedEntries.reduce((acc, curr) => {
+                const type = String(curr.actionType || "NÃO DEFINIDA");
+                if (!acc[type]) acc[type] = { total: 0, count: 0 };
+                acc[type].total += parseCurrency(curr.value);
+                acc[type].count += 1;
+                return acc;
+            }, {});
+            return Object.entries(groups).map(([name, data]) => ({ name, ...data })).sort((a, b) => b.total - a.total);
+        } catch(e) { return []; }
+    }, [feedEntries, parseCurrency]);
 
-      {status.msg && (
-        <div className={`fixed top-20 left-1/2 -translate-x-1/2 z-50 w-[90%] max-w-sm px-4 py-3.5 rounded-xl shadow-2xl flex items-center gap-3 animate-in fade-in slide-in-from-top-4 backdrop-blur-md border ${
-          status.type === 'error' ? 'bg-rose-950/90 text-rose-100 border-rose-800' : 'bg-emerald-950/90 text-emerald-100 border-emerald-800'
-        }`}>
-          {status.type === 'error' ? <AlertCircle size={20} className="text-rose-400" /> : <CheckCircle2 size={20} className="text-emerald-400" />}
-          <span className="text-sm font-semibold">{status.msg}</span>
-        </div>
-      )}
+    const feedStatsByDoctor = useMemo(() => {
+        try {
+            const groups = feedEntries.reduce((acc, curr) => {
+                const crmKey = String(curr.crm || "").trim().toUpperCase();
+                const groupKey = crmKey || String(curr.doctorName || "DESCONHECIDO").trim().toUpperCase();
+                if (!acc[groupKey]) {
+                    acc[groupKey] = { 
+                        total: 0, count: 0, doctorName: String(curr.doctorName || "DESCONHECIDO"), 
+                        category: String(curr.category || "-"), crm: crmKey || "-", 
+                        createdAt: (curr.createdAt && typeof curr.createdAt.getTime === 'function') ? curr.createdAt.getTime() : 0
+                    };
+                } else {
+                    const currTime = (curr.createdAt && typeof curr.createdAt.getTime === 'function') ? curr.createdAt.getTime() : 0;
+                    if (currTime < acc[groupKey].createdAt) {
+                        acc[groupKey].doctorName = String(curr.doctorName || "DESCONHECIDO");
+                        acc[groupKey].category = String(curr.category || "-");
+                        acc[groupKey].createdAt = currTime;
+                    }
+                }
+                acc[groupKey].total += parseCurrency(curr.value);
+                acc[groupKey].count += 1;
+                return acc;
+            }, {});
+            return Object.values(groups).sort((a, b) => b.total - a.total);
+        } catch(e) { return []; }
+    }, [feedEntries, parseCurrency]);
 
-      <main className="max-w-md mx-auto p-4 pt-6">
-        {view === 'form' && (
-          <div className="animate-in fade-in zoom-in-95 duration-300">
-            <div className="bg-white rounded-2xl p-6 shadow-xl shadow-slate-200/50 border border-slate-100">
-              <h2 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-6 flex items-center gap-2">
-                <Plus size={16} className="text-emerald-600" /> Nova Solicitação
-              </h2>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-emerald-700 uppercase ml-1">Equipe / Regional</label>
-                  <div className="relative">
-                    <MapPin className="absolute left-3 top-3.5 text-emerald-600" size={18} />
-                    <select name="team" value={formData.team} onChange={handleInputChange} className="w-full pl-10 pr-4 py-3 bg-emerald-50/50 border border-emerald-200 rounded-xl focus:border-emerald-500 outline-none text-sm font-bold text-emerald-800 appearance-none">
-                      <option value="">Selecione...</option>
-                      {TEAMS.map(t => <option key={t} value={t}>{t}</option>)}
-                    </select>
-                  </div>
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Seu Nome (Solicitante)</label>
-                  <div className="relative group">
-                    <Briefcase className="absolute left-3 top-3.5 text-slate-300 group-focus-within:text-emerald-600" size={18} />
-                    <input name="requesterName" value={formData.requesterName} onChange={handleInputChange} placeholder="Seu Nome" className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-emerald-500 outline-none font-semibold text-slate-700 text-sm" />
-                  </div>
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Médico / Ação</label>
-                  <div className="relative group">
-                    <User className="absolute left-3 top-3.5 text-slate-300 group-focus-within:text-emerald-600" size={18} />
-                    <input name="doctorName" value={formData.doctorName} onChange={handleInputChange} placeholder="Nome do Médico" className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-emerald-500 outline-none font-semibold text-slate-700 text-sm" />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">CRM/UF</label>
-                    <div className="relative group">
-                      <Stethoscope className="absolute left-3 top-3.5 text-slate-300 group-focus-within:text-emerald-600" size={18} />
-                      <input name="crm" value={formData.crm} onChange={handleInputChange} placeholder="00000-XX" className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-emerald-500 outline-none uppercase font-semibold text-slate-700 text-sm" />
-                    </div>
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold text-emerald-700 uppercase ml-1">Valor Total</label>
-                    <div className="relative group">
-                      <Wallet className="absolute left-3 top-3.5 text-emerald-600" size={18} />
-                      <input name="value" value={formData.value} onChange={handleInputChange} placeholder="0,00" className="w-full pl-10 pr-4 py-3 bg-emerald-50/50 border border-emerald-200 rounded-xl focus:bg-white focus:border-emerald-500 outline-none font-bold text-emerald-800 text-sm" />
-                    </div>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Categoria</label>
-                    <select name="category" value={formData.category} onChange={handleInputChange} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:border-emerald-500 outline-none text-sm font-semibold text-slate-600">
-                      <option value="">Selecione...</option>
-                      {categories.map(c => <option key={c} value={c}>{c}</option>)}
-                    </select>
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Ação</label>
-                    <select name="actionType" value={formData.actionType} onChange={handleInputChange} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:border-emerald-500 outline-none text-sm font-semibold text-slate-600">
-                      <option value="">Selecione...</option>
-                      {actionTypes.map(t => <option key={t} value={t}>{t}</option>)}
-                    </select>
-                  </div>
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Observações</label>
-                  <textarea name="observations" value={formData.observations} onChange={handleInputChange} rows="2" className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-emerald-500 outline-none resize-none text-sm" />
-                </div>
-                <button type="submit" className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-4 rounded-xl shadow-lg shadow-slate-900/20 flex items-center justify-center gap-2 active:scale-[0.98] transition-all">
-                  <Send size={18} className="text-emerald-400" />
-                  Enviar Lançamento
-                </button>
-              </form>
-            </div>
-          </div>
-        )}
+    const countEntriesAdmin = filteredEntriesAdmin.length;
+    const totalInvestedAdmin = useMemo(() => {
+        try { return filteredEntriesAdmin.reduce((acc, curr) => acc + parseCurrency(curr.value), 0); } 
+        catch(e) { return 0; }
+    }, [filteredEntriesAdmin, parseCurrency]);
 
-        {view === 'history' && (
-          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-4">
-            <div className="flex justify-between items-center px-1 mb-2">
-              <h2 className="text-sm font-bold text-slate-500 uppercase tracking-widest">Feed de Lançamentos</h2>
-              <span className="bg-slate-200 text-slate-700 text-[10px] font-bold px-2.5 py-1 rounded-md">{entries.filter(e => e.team === formData.team).length} ITENS</span>
-            </div>
-            {loading ? (
-              <div className="flex justify-center py-10"><div className="w-8 h-8 border-2 border-slate-200 border-t-emerald-600 rounded-full animate-spin"></div></div>
-            ) : entries.filter(e => e.team === formData.team).length === 0 ? (
-              <div className="bg-white rounded-2xl p-10 text-center border border-dashed border-slate-300"><p className="text-slate-400 text-sm">Nenhum registo da sua equipa.</p></div>
-            ) : (
-              <div className="space-y-3">
-                {entries.filter(e => e.team === formData.team).map(e => (
-                  <div key={e.id} className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex justify-between items-start group">
-                    <div className="flex-1 min-w-0">
-                      <div className="mb-2 flex items-center justify-between">
-                         <div className="flex items-center gap-1.5">
-                            <Briefcase size={12} className="text-slate-400" />
-                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide truncate">{e.requesterName}</span>
-                         </div>
-                         <span className="text-[8px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100 uppercase">{e.team}</span>
-                      </div>
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="font-bold text-slate-800 text-sm truncate">{e.doctorName}</span>
-                        <span className="text-[9px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-bold uppercase shrink-0">{e.category}</span>
-                      </div>
-                      <div className="flex items-center gap-2 mt-1.5">
-                        <span className="font-black text-emerald-600 text-sm shrink-0">R$ {e.value}</span>
-                        <div className="h-3 w-[1px] bg-slate-300"></div>
-                        <span className="text-slate-500 text-[11px] font-bold uppercase truncate">{e.actionType}</span>
-                      </div>
-                      <div className="text-[10px] text-slate-400 mt-2 font-medium">
-                        {e.createdAt.toLocaleDateString()} • CRM {e.crm}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
+    const statsByTeam = useMemo(() => {
+        try {
+            const groups = filteredEntriesAdmin.reduce((acc, curr) => {
+                const team = String(curr.team || "SEM ESTRUTURA");
+                if (!acc[team]) acc[team] = { total: 0, count: 0 };
+                acc[team].total += parseCurrency(curr.value);
+                acc[team].count += 1;
+                return acc;
+            }, {});
+            return Object.entries(groups).map(([name, data]) => ({ name, ...data })).sort((a, b) => b.total - a.total);
+        } catch(e) { return []; }
+    }, [filteredEntriesAdmin, parseCurrency]);
 
-        {view === 'admin' && (
-          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-            {!currentAdmin ? (
-              <div className="bg-white rounded-2xl p-8 shadow-xl border border-slate-100 text-center mt-10">
-                <ShieldAlert size={48} className="mx-auto text-emerald-600 mb-4" />
-                <h2 className="text-xl font-bold text-slate-800 mb-2">Portal do Gestor</h2>
-                <form onSubmit={handleAdminLogin} className="space-y-4 max-w-xs mx-auto mt-6">
-                  <div className="relative">
-                    <Lock className="absolute left-4 top-3.5 text-slate-400" size={20} />
-                    <input type="password" value={pinInput} onChange={(e) => setPinInput(e.target.value)} placeholder="Seu PIN" className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl focus:border-emerald-500 outline-none text-center font-bold tracking-[0.5em] text-lg" maxLength={6} />
-                  </div>
-                  <button type="submit" className="w-full bg-slate-900 text-white font-bold py-3.5 rounded-xl shadow-lg active:scale-95 transition-all">Acessar Painel</button>
-                </form>
-              </div>
-            ) : (
-              <div className="space-y-5">
-                <div className="flex justify-between items-center bg-emerald-50 border border-emerald-100 p-3 rounded-xl shadow-sm">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 bg-emerald-200 rounded-full flex items-center justify-center">
-                      <User size={16} className="text-emerald-700" />
-                    </div>
-                    <div>
-                      <p className="text-[10px] text-emerald-600 font-bold uppercase">{currentAdmin.isGeneral ? "Nível Nacional" : "Nível Regional"}</p>
-                      <p className="text-sm font-bold text-slate-800">{currentAdmin.name}</p>
-                    </div>
-                  </div>
-                  <button onClick={logoutAdmin} className="text-[10px] font-bold uppercase text-slate-500 bg-white rounded-md border border-slate-200 px-3 py-1.5">Sair</button>
-                </div>
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        const { team, requesterName, doctorName, value, observations, crm, category, actionType } = formData;
+        if (!team || !requesterName || !doctorName || !value || !observations || !crm || !category || !actionType) {
+            return alert("Preencha todos os campos obrigatórios.");
+        }
+        try {
+            await addDoc(collection(db, COLLECTION_NAME), { ...formData, userId: user.uid, createdAt: new Date() });
+            setFormData({ ...formData, doctorName: '', crm: '', value: '', observations: '', category: '', actionType: '' }); 
+            notify("REGISTADO COM SUCESSO!");
+            setView('history');
+        } catch (err) { alert("Erro ao gravar: " + err.message); }
+    };
 
-                {currentAdmin.isGeneral && (
-                  <div className="bg-slate-900 p-3 rounded-xl shadow-lg border border-slate-800">
-                    <label className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest mb-1.5 block">Visão de Dados</label>
-                    <select value={adminGeneralFilter} onChange={(e) => setAdminGeneralFilter(e.target.value)} className="w-full px-3 py-2 bg-slate-800 text-white border border-slate-700 rounded-lg outline-none text-sm font-semibold">
-                      <option value="ALL">🌎 Visão Geral Brasil</option>
-                      {TEAMS.map(t => <option key={t} value={t}>📍 {t}</option>)}
-                    </select>
-                  </div>
-                )}
+    const confirmDelete = async () => {
+        if (!deleteTarget) return;
+        try {
+            setEntries(prev => prev.filter(e => e.id !== deleteTarget.id));
+            await deleteDoc(doc(db, COLLECTION_NAME, deleteTarget.id));
+            setDeleteTarget(null);
+            notify("LANÇAMENTO REMOVIDO.");
+        } catch (err) { alert("Erro ao excluir."); }
+    };
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="bg-slate-900 rounded-2xl p-4 shadow-lg border border-slate-800 relative overflow-hidden">
-                    <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mb-1 relative z-10">Verba Utilizada</p>
-                    <h3 className="text-lg font-bold text-white relative z-10"><span className="text-emerald-400 text-sm mr-1">R$</span>{totalInvested.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h3>
-                  </div>
-                  <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 relative overflow-hidden">
-                    <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest mb-1 relative z-10">Total Ações</p>
-                    <h3 className="text-2xl font-black text-slate-800 relative z-10">{adminFilteredEntries.length}</h3>
-                  </div>
-                </div>
+    const handleAdminLogin = (e) => {
+        e.preventDefault();
+        if (ADMIN_USERS[pinInput]) {
+            setCurrentAdmin(ADMIN_USERS[pinInput]);
+            setPinInput('');
+        } else {
+            alert("PIN INCORRETO");
+        }
+    };
 
-                <div className="flex bg-slate-200/50 p-1 rounded-xl">
-                  <button onClick={() => setAdminTab('reports')} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${adminTab === 'reports' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-500'}`}>Análises</button>
-                  <button onClick={() => setAdminTab('manage')} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${adminTab === 'manage' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-500'}`}>Controle</button>
-                </div>
+    const logoutAdmin = () => { setCurrentAdmin(null); setPinInput(''); };
+    const currentReps = REPRESENTATIVES[formData.team] || [];
 
-                {adminTab === 'reports' && (
-                  <div className="space-y-5 animate-in fade-in">
-                    <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
-                      <h3 className="text-xs font-bold text-slate-800 uppercase tracking-widest mb-4 flex items-center gap-2"><Users size={16} className="text-emerald-500" /> Por Solicitante</h3>
-                      <div className="space-y-4">
-                        {statsByUser.map((stat, idx) => (
-                          <div key={idx} className="space-y-1.5">
-                            <div className="flex justify-between text-xs font-semibold"><span className="text-slate-700">{stat.name}</span><span className="text-emerald-700">R$ {stat.total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></div>
-                            <div className="w-full bg-slate-100 rounded-full h-2"><div className="bg-emerald-500 h-2 rounded-full" style={{ width: `${(stat.total / maxUserTotal) * 100}%` }}></div></div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                )}
+    const isAllTeams = currentAdmin && currentAdmin.isGeneral && adminGeneralFilter === 'ALL';
+    const hasNoTeam = !currentAdmin && !formData.team;
+    const inputDisabled = isAllTeams || hasNoTeam;
 
-                {adminTab === 'manage' && (
-                  <div className="space-y-3 animate-in fade-in">
-                    {adminFilteredEntries.map(e => (
-                      <div key={e.id} className="bg-white p-3.5 rounded-xl shadow-sm border border-slate-200 flex justify-between items-center">
-                        <div className="flex-1 min-w-0 pr-2">
-                          <p className="text-[10px] font-bold text-slate-500 uppercase">{e.requesterName}</p>
-                          <p className="font-bold text-slate-800 text-sm truncate">{e.doctorName}</p>
-                          <p className="text-xs font-semibold text-slate-600 mt-1">R$ {e.value} - <span className="font-normal text-slate-500">{e.actionType}</span></p>
+    const getFeedTitle = () => {
+        if (currentAdmin) {
+            if (currentAdmin.isGeneral && adminGeneralFilter === 'ALL') return "Total Brasil (Geral)";
+            if (currentAdmin.isGeneral && adminGeneralFilter !== 'MINE') return `Total ${adminGeneralFilter}`;
+            return `Total Equipe (${currentAdmin.team})`;
+        }
+        return formData.team ? `Seu Total (${formData.team})` : "Seu Total Utilizado";
+    };
+
+    return (
+        <div className="min-h-screen bg-slate-100 pb-24 text-slate-900 font-sans">
+            
+            {deleteTarget && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 animate-in fade-in duration-200">
+                    <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setDeleteTarget(null)}></div>
+                    <div className="relative bg-white w-full max-sm:rounded-3xl rounded-[2.5rem] shadow-2xl p-8 animate-in zoom-in-95 border border-slate-100 text-center">
+                        <i className="ph-fill ph-warning-octagon text-rose-600 text-5xl mb-4"></i>
+                        <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Confirmar Exclusão?</h3>
+                        <p className="text-sm text-slate-500 my-4 px-2 italic">Excluir lançamento de <strong className="text-slate-800">{deleteTarget.doctorName}</strong>?</p>
+                        <div className="space-y-3">
+                            <button onClick={confirmDelete} className="w-full bg-rose-600 text-white font-black py-4 rounded-2xl active:scale-95 transition-all shadow-lg uppercase text-sm tracking-widest">Sim, Apagar</button>
+                            <button onClick={() => setDeleteTarget(null)} className="w-full bg-slate-100 text-slate-500 font-bold py-4 rounded-2xl active:scale-95 transition-all uppercase text-sm">Cancelar</button>
                         </div>
-                        <button onClick={() => deleteEntry(e.id, true)} className="px-3 py-2 bg-rose-50 text-rose-600 rounded-lg text-xs font-bold transition-all"><Trash2 size={14} /></button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+                    </div>
+                </div>
             )}
-          </div>
-        )}
-      </main>
 
-      <nav className="fixed bottom-0 w-full bg-white/95 backdrop-blur-2xl border-t border-slate-200 px-4 py-3 flex justify-around items-center z-50 shadow-[0_-10px_40px_rgba(0,0,0,0.06)] pb-safe-area">
-        <button onClick={() => setView('form')} className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all ${view === 'form' ? 'text-emerald-600' : 'text-slate-400 hover:bg-slate-50'}`}><Plus size={22} /><span className="text-[9px] font-bold uppercase">Novo</span></button>
-        <button onClick={() => setView('history')} className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all ${view === 'history' ? 'text-emerald-600' : 'text-slate-400 hover:bg-slate-50'}`}><ListFilter size={22} /><span className="text-[9px] font-bold uppercase">Feed</span></button>
-        <div className="w-[1px] h-8 bg-slate-200"></div>
-        <button onClick={() => setView('admin')} className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all ${view === 'admin' ? 'text-slate-900' : 'text-slate-400 hover:bg-slate-50'}`}><ShieldAlert size={22} /><span className="text-[9px] font-bold uppercase">Gestor</span></button>
-      </nav>
-    </div>
-  );
+            <header className="sticky top-0 z-50 bg-slate-900 p-5 border-b border-slate-800 shadow-xl text-white">
+                <div className="max-w-md mx-auto flex justify-between items-center">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center font-black italic shadow-lg text-white">PF</div>
+                        <div>
+                            <h1 className="text-base font-black tracking-tight uppercase leading-none">Pierre Fabre</h1>
+                            <p className="text-[10px] text-emerald-400 font-bold tracking-[0.3em] uppercase mt-1">Corporate Brasil</p>
+                        </div>
+                    </div>
+                    <i className="ph-bold ph-file-csv text-emerald-400 text-2xl active:scale-90 transition-all cursor-pointer hover:text-emerald-300" onClick={exportToCSV} title="Exportar para Excel"></i>
+                </div>
+            </header>
+
+            {status.msg && (
+                <div className="fixed top-24 left-1/2 -translate-x-1/2 z-50 bg-emerald-900 text-emerald-100 px-6 py-3 rounded-full shadow-2xl border border-emerald-700 font-bold text-xs animate-bounce uppercase">
+                    {status.msg}
+                </div>
+            )}
+
+            <main className="max-w-md mx-auto p-4">
+                {view === 'form' && (
+                    <div className="bg-white rounded-[2rem] p-7 shadow-2xl border border-slate-100 animate-in fade-in zoom-in-95">
+                        <h2 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] mb-7 flex items-center gap-2">
+                            <i className="ph-bold ph-plus-circle text-emerald-500 text-lg"></i> Nova Solicitação
+                        </h2>
+                        <form onSubmit={handleSubmit} className="space-y-5">
+                            
+                            <div className="group space-y-1.5">
+                                <label className="text-xs font-bold text-slate-500 ml-1 uppercase tracking-widest italic">Sua Estrutura</label>
+                                <select 
+                                    value={formData.team} 
+                                    onChange={e => setFormData({...formData, team: e.target.value, requesterName: ''})} 
+                                    className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl font-bold text-sm outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-50 transition-all hover:bg-slate-100 hover:border-slate-300 active:scale-[0.98] active:shadow-inner uppercase"
+                                >
+                                    <option value="" className="text-[10px]">SELECIONAR ESTRUTURA...</option>
+                                    {TEAMS.map(t => <option key={t} value={t} className="text-[10px]">{t}</option>)}
+                                </select>
+                            </div>
+
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-bold text-slate-500 ml-1 uppercase tracking-widest italic">Seu Nome (Solicitante)</label>
+                                {currentReps.length > 0 ? (
+                                    <select 
+                                        value={formData.requesterName} 
+                                        onChange={e => setFormData({...formData, requesterName: e.target.value})} 
+                                        className="w-full p-4 bg-emerald-50 border-2 border-emerald-100 rounded-2xl font-bold text-sm outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-50 hover:bg-emerald-100 transition-all active:scale-[0.98] shadow-inner uppercase"
+                                    >
+                                        <option value="" className="text-[10px]">SELECIONAR SEU NOME...</option>
+                                        {currentReps.map(name => <option key={name} value={name} className="text-[10px]">{name}</option>)}
+                                        <option value="OUTRO" className="text-[10px]">OUTRO (MANUAL)</option>
+                                    </select>
+                                ) : (
+                                    <input 
+                                        value={formData.requesterName} 
+                                        onChange={e => setFormData({...formData, requesterName: e.target.value})} 
+                                        placeholder={formData.team ? "DIGITE SEU NOME COMPLETO" : "ESCOLHA A ESTRUTURA ACIMA"} 
+                                        disabled={!formData.team}
+                                        className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl font-bold text-sm outline-none uppercase transition-all focus:border-emerald-500" 
+                                    />
+                                )}
+                            </div>
+
+                            <input value={formData.doctorName} onChange={e => setFormData({...formData, doctorName: e.target.value})} placeholder="NOME DO MÉDICO / DESTINATÁRIO" className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl font-bold text-sm outline-none focus:border-emerald-500 transition-all uppercase placeholder:text-slate-400" />
+                            
+                            <div className="grid grid-cols-2 gap-4">
+                                <input 
+                                    value={formData.crm} 
+                                    onChange={e => setFormData({...formData, crm: e.target.value})} 
+                                    placeholder="UF-CRM" 
+                                    maxLength={7}
+                                    className="p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl font-bold text-sm outline-none uppercase focus:border-emerald-500 transition-all placeholder:text-slate-400" 
+                                />
+                                <input value={formData.value} onChange={e => setFormData({...formData, value: formatValueInput(e.target.value)})} placeholder="R$ 0,00" className="p-4 bg-emerald-50 border-2 border-emerald-100 rounded-2xl font-black text-emerald-800 text-sm outline-none focus:border-emerald-500 transition-all text-center placeholder:text-emerald-400" />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <select value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})} className="p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl text-sm font-bold focus:border-emerald-500 active:scale-[0.98] transition-all hover:bg-slate-100 uppercase">
+                                    <option value="" className="text-[10px]">CATEGORIA...</option>
+                                    {CATEGORIES.map(c => <option key={c} value={c} className="text-[10px]">{c}</option>)}
+                                </select>
+                                <select value={formData.actionType} onChange={e => setFormData({...formData, actionType: e.target.value})} className="p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl text-sm font-bold focus:border-emerald-500 active:scale-[0.98] transition-all hover:bg-slate-100 uppercase">
+                                    <option value="" className="text-[10px]">AÇÃO...</option>
+                                    {ACTION_TYPES.map(a => <option key={a} value={a} className="text-[10px]">{a}</option>)}
+                                </select>
+                            </div>
+
+                            <textarea value={formData.observations} onChange={e => setFormData({...formData, observations: e.target.value})} placeholder="DETALHE A AÇÃO AQUI..." rows="3" className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl text-sm font-medium outline-none focus:border-emerald-500 transition-all uppercase placeholder:text-slate-400" />
+                            
+                            <button type="submit" className="w-full bg-slate-900 text-white font-black py-5 rounded-2xl shadow-2xl active:scale-[0.96] transition-all flex items-center justify-center gap-2 uppercase text-sm tracking-widest mt-4">
+                                <i className="ph-bold ph-check-circle text-emerald-400 text-xl"></i> Registrar solicitação
+                            </button>
+                        </form>
+                    </div>
+                )}
+
+                {view === 'history' && (
+                    <div className="space-y-5 animate-in slide-in-from-bottom-4 duration-500 pb-10">
+                        
+                        {currentAdmin && currentAdmin.isGeneral && (
+                            <select 
+                                value={adminGeneralFilter} 
+                                onChange={e => setAdminGeneralFilter(e.target.value)} 
+                                className="w-full p-3.5 bg-slate-900 text-white rounded-2xl font-bold text-xs outline-none shadow-xl active:scale-[0.98] transition-all uppercase tracking-widest"
+                            >
+                                <option value="ALL">🌎 VISÃO GERAL BRASIL (SOMA)</option>
+                                <option value="MINE">👤 MINHA EQUIPE ({currentAdmin.team})</option>
+                                {TEAMS.map(t => <option key={t} value={t}>📍 {t}</option>)}
+                            </select>
+                        )}
+
+                        <div className="bg-slate-900 rounded-[2rem] p-6 shadow-2xl text-white space-y-5 border border-slate-800 relative overflow-hidden">
+                            <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 rounded-full blur-3xl"></div>
+                            <div className="flex justify-between items-center border-b border-slate-800 pb-4 relative z-10">
+                                <div>
+                                    <p className="text-[10px] font-black text-emerald-400 uppercase tracking-[0.2em] mb-1">
+                                        {getFeedTitle()}
+                                    </p>
+                                    <h4 className="text-2xl font-black tracking-tight">R$ {Number(totalUsedFeed).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h4>
+                                </div>
+                                <div className="text-right">
+                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">Registos</p>
+                                    <h4 className="text-2xl font-black text-slate-300">{feedEntries.length}</h4>
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-5 relative z-10">
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                                        {isAllTeams ? "Teto do Brasil" : "Teto da Distrital"}
+                                    </label>
+                                    <input 
+                                        value={displayBudgetCeiling} 
+                                        onChange={e => handleBudgetChange(formatValueInput(e.target.value))} 
+                                        placeholder={isAllTeams ? "SOMA AUTOMÁTICA" : "R$ 0,00"} 
+                                        disabled={inputDisabled}
+                                        className={`w-full bg-slate-800/80 border border-slate-700 rounded-xl p-3 text-sm font-black text-emerald-100 focus:ring-2 focus:ring-emerald-500 uppercase text-center transition-all ${inputDisabled ? 'opacity-60 cursor-not-allowed' : ''}`} 
+                                    />
+                                </div>
+                                <div className="text-right flex flex-col justify-end">
+                                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Saldo Livre</p>
+                                    <h4 className={`text-lg font-black ${budgetBalance < 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
+                                        R$ {Number(budgetBalance).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                    </h4>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="space-y-4">
+                            {feedStatsByRep.length > 0 && currentAdmin && (
+                                <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
+                                    <h3 className="text-[10px] font-black text-slate-800 uppercase tracking-widest mb-3 border-l-2 border-emerald-500 pl-2">Top Representantes</h3>
+                                    <div className="space-y-2 max-h-32 overflow-y-auto pr-2">
+                                        {feedStatsByRep.map((s, i) => (
+                                            <div key={i} className="flex justify-between items-center text-xs border-b border-slate-50 pb-1.5 last:border-0">
+                                                <span className="font-bold text-slate-600 truncate pr-2 uppercase">{i+1}. {s.name}</span>
+                                                <span className="font-black text-emerald-600 shrink-0">R$ {Number(s.total).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            <div className="grid grid-cols-1 gap-4">
+                                {feedStatsByAction.length > 0 && (
+                                    <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
+                                        <h3 className="text-[10px] font-black text-slate-800 uppercase tracking-widest mb-3 border-l-2 border-sky-500 pl-2">Top Ações</h3>
+                                        <div className="space-y-2 max-h-32 overflow-y-auto pr-2">
+                                            {feedStatsByAction.map((s, i) => (
+                                                <div key={i} className="flex justify-between items-center text-xs border-b border-slate-50 pb-1.5 last:border-0">
+                                                <span className="font-bold text-slate-600 truncate pr-2 uppercase">{i+1}. {s.name}</span>
+                                                    <span className="font-black text-sky-600 shrink-0">R$ {Number(s.total).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {feedStatsByDoctor.length > 0 && (
+                                    <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
+                                        <h3 className="text-[10px] font-black text-slate-800 uppercase tracking-widest mb-3 border-l-2 border-indigo-500 pl-2">Top Médicos (Por CRM)</h3>
+                                        <div className="space-y-3 max-h-48 overflow-y-auto pr-2">
+                                            {feedStatsByDoctor.map((s, i) => (
+                                                <div key={i} className="flex justify-between items-center text-xs border-b border-slate-50 pb-2 last:border-0">
+                                                    <div className="flex flex-col min-w-0 pr-2">
+                                                        <span className="font-bold text-slate-700 truncate uppercase">{i+1}. {s.doctorName}</span>
+                                                        <div className="flex items-center gap-1.5 mt-0.5">
+                                                            <span className="text-[9px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-bold">{s.crm}</span>
+                                                            <span className="text-[9px] font-black uppercase text-indigo-500">{s.category}</span>
+                                                        </div>
+                                                    </div>
+                                                    <span className="font-black text-indigo-600 shrink-0 text-sm">R$ {Number(s.total).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="flex justify-between items-center px-3 mt-8">
+                            <h2 className="text-xs font-black text-slate-400 uppercase tracking-widest border-l-4 border-emerald-500 pl-2">
+                                Lista de Atividades
+                            </h2>
+                        </div>
+                        
+                        {feedEntries.length === 0 ? (
+                            <div className="bg-white p-10 rounded-3xl text-center border border-dashed border-slate-300">
+                                <i className="ph-fill ph-warning-circle text-4xl text-slate-300 mb-3"></i>
+                                <p className="text-xs font-black text-slate-400 uppercase tracking-widest leading-relaxed">
+                                    {!formData.requesterName && !currentAdmin
+                                        ? "Selecione seu nome na aba NOVO para visualizar."
+                                        : "Nenhum lançamento encontrado."}
+                                </p>
+                            </div>
+                        ) : (
+                            feedEntries.map(e => (
+                                <div key={e.id} className="bg-white p-5 rounded-2xl shadow-md border border-slate-100 flex justify-between items-start active:scale-[0.98] transition-all">
+                                    <div className="min-w-0 pr-4 text-left">
+                                        <span className="text-[9px] font-black text-emerald-600 uppercase bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-100">{String(e.team || 'S/ Equipe')}</span>
+                                        <h3 className="font-bold text-slate-800 text-sm truncate mt-2 uppercase leading-tight">{String(e.doctorName || '')}</h3>
+                                        <p className="text-[11px] text-slate-500 font-bold uppercase truncate opacity-70 mt-0.5">{String(e.requesterName || '')} • {String(e.actionType || '')}</p>
+                                    </div>
+                                    <div className="text-right shrink-0">
+                                        <p className="font-black text-slate-900 text-sm uppercase tracking-tighter">R$ {String(e.value || '0,00')}</p>
+                                        <p className="text-[10px] text-slate-400 font-bold mt-1">{formatDate(e.createdAt)}</p>
+                                    </div>
+                                </div>
+                            ))
+                        )}
+                    </div>
+                )}
+
+                {view === 'admin' && (
+                    <div className="animate-in fade-in duration-500">
+                        {!currentAdmin ? (
+                            <div className="bg-white p-10 rounded-[2.5rem] shadow-2xl text-center border border-slate-100 mt-10">
+                                <div className="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner"><i className="ph-fill ph-shield-check text-5xl"></i></div>
+                                <h2 className="text-2xl font-black text-slate-800 mb-2 tracking-tight uppercase">Portal do Gestor</h2>
+                                <p className="text-xs text-slate-400 font-bold mt-2">Área restrita à liderança.</p>
+                                <form onSubmit={handleAdminLogin} className="space-y-6 mt-8">
+                                    <input type="password" value={pinInput} onChange={e => setPinInput(e.target.value)} placeholder="PIN" className="w-full p-5 bg-slate-100 rounded-2xl text-center text-4xl font-black tracking-[0.5em] outline-none border-2 border-transparent focus:border-emerald-500 uppercase shadow-inner transition-all" maxLength={6} />
+                                    <button type="submit" className="w-full bg-slate-900 text-white font-black py-5 rounded-2xl shadow-xl uppercase text-sm tracking-widest active:scale-95 transition-all">Acessar Painel</button>
+                                </form>
+                            </div>
+                        ) : (
+                            <div className="space-y-6">
+                                <div className="bg-slate-900 text-white p-6 rounded-[2rem] shadow-2xl flex justify-between items-center transition-all">
+                                    <div>
+                                        <p className="text-[10px] font-black text-emerald-400 uppercase tracking-widest leading-none mb-1.5 italic">Gestão: {currentAdmin.isGeneral ? "Nacional" : "Regional"}</p>
+                                        <h3 className="font-bold text-lg tracking-tight uppercase leading-tight">{currentAdmin.name}</h3>
+                                    </div>
+                                    <button onClick={logoutAdmin} className="text-xs font-black uppercase bg-rose-500/20 text-rose-400 px-4 py-2.5 rounded-xl active:scale-90 shadow-md border border-rose-500/30 transition-all">Sair</button>
+                                </div>
+                                
+                                <div className="flex bg-slate-200 p-1.5 rounded-2xl shadow-inner text-center">
+                                    <button onClick={() => setAdminTab('reports')} className={`flex-1 py-3 text-xs font-black uppercase rounded-xl transition-all ${adminTab === 'reports' ? 'bg-white text-emerald-600 shadow-xl' : 'text-slate-500 hover:text-slate-700'}`}>Relatórios</button>
+                                    <button onClick={() => setAdminTab('manage')} className={`flex-1 py-3 text-xs font-black uppercase rounded-xl transition-all ${adminTab === 'manage' ? 'bg-white text-rose-600 shadow-xl' : 'text-slate-500 hover:text-slate-700'}`}>Auditoria</button>
+                                </div>
+
+                                {adminTab === 'reports' ? (
+                                    <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
+                                        {currentAdmin.isGeneral && (
+                                            <select value={adminGeneralFilter} onChange={e => setAdminGeneralFilter(e.target.value)} className="w-full p-4 bg-slate-900 text-white rounded-2xl font-bold text-sm outline-none shadow-2xl active:scale-[0.98] transition-all uppercase tracking-widest">
+                                                <option value="ALL" className="text-[10px]">🌎 VISÃO GERAL BRASIL</option>
+                                                <option value="MINE" className="text-[10px]">👤 MINHA EQUIPE</option>
+                                                {TEAMS.map(t => <option key={t} value={t} className="text-[10px]">📍 {t}</option>)}
+                                            </select>
+                                        )}
+
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div className="bg-white p-6 rounded-[2rem] shadow-lg border border-slate-200 text-center uppercase"><p className="text-[10px] font-black text-slate-400 mb-2 tracking-widest leading-none">Investimento</p><h4 className="text-lg font-black text-emerald-600 leading-none">R$ {Number(totalInvestedAdmin).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h4></div>
+                                            <div className="bg-white p-6 rounded-[2rem] shadow-lg border border-slate-200 text-center uppercase"><p className="text-[10px] font-black text-slate-400 mb-2 tracking-widest leading-none">Total Lançamentos</p><h4 className="text-3xl font-black text-slate-800 leading-none">{countEntriesAdmin}</h4></div>
+                                        </div>
+
+                                        {/* RANKING: TOTAL POR DISTRITAL (EXCLUSIVO ADMIN GERAL) */}
+                                        {currentAdmin.isGeneral && (
+                                            <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100">
+                                                <h3 className="text-[10px] font-black text-slate-800 uppercase tracking-[0.2em] mb-6 flex items-center gap-2"><i className="ph-bold ph-map-pin text-emerald-500 text-lg"></i> Total por Distrital</h3>
+                                                <div className="space-y-4 max-h-64 overflow-y-auto pr-2">
+                                                    {statsByTeam.map((s, i) => (
+                                                        <div key={i} className="space-y-2 animate-in slide-in-from-left-2 duration-300 border-b border-slate-50 pb-2 last:border-0">
+                                                            <div className="flex justify-between text-[11px] font-bold uppercase">
+                                                                <span className="text-slate-600 truncate pr-4 leading-none">{i+1}. {s.name}</span>
+                                                                <span className="text-emerald-700 font-black shrink-0">R$ {Number(s.total).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                                                            </div>
+                                                            <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden shadow-inner"><div className="bg-emerald-500 h-full rounded-full transition-all duration-1000" style={{ width: totalInvestedAdmin > 0 ? `${(s.total/totalInvestedAdmin)*100}%` : '0%' }}></div></div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                    </div>
+                                ) : (
+                                    <div className="space-y-5 animate-in slide-in-from-left-4 duration-300">
+                                        <div className="bg-rose-50 border border-rose-100 p-5 rounded-2xl flex gap-3 shadow-sm italic text-rose-700 text-xs font-bold uppercase leading-tight items-center"><i className="ph-fill ph-warning-circle text-rose-500 text-2xl shrink-0"></i>Moderação Ativa: Cuidado, a exclusão é permanente.</div>
+                                        {filteredEntriesAdmin.map(e => (
+                                            <div key={e.id} className="bg-white p-5 rounded-2xl shadow-md border border-slate-100 flex justify-between items-center active:scale-[0.98] transition-all">
+                                                <div className="min-w-0 pr-4 text-left">
+                                                    <p className="text-[10px] font-black text-rose-500 uppercase italic tracking-wider mb-1">{String(e.team || '')}</p>
+                                                    <h3 className="font-bold text-slate-800 text-sm truncate uppercase leading-tight">{String(e.doctorName || '')}</h3>
+                                                    <p className="text-[11px] text-slate-500 font-bold uppercase truncate opacity-70 mt-0.5">R$ {String(e.value || '0,00')} • {String(e.requesterName || '')}</p>
+                                                </div>
+                                                <button onClick={() => setDeleteTarget(e)} className="w-12 h-12 bg-rose-50 text-rose-600 rounded-2xl flex items-center justify-center shadow-sm active:scale-90 border border-rose-100 transition-all"><i className="ph-bold ph-trash text-xl"></i></button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                )}
+            </main>
+
+            <nav className="fixed bottom-0 w-full bg-white/95 backdrop-blur-md border-t border-slate-200 flex justify-around p-4 z-50 shadow-[0_-15px_40px_rgba(0,0,0,0.1)]">
+                <button onClick={() => setView('form')} className={`flex flex-col items-center gap-1.5 p-2 transition-all active:scale-90 ${view === 'form' ? 'text-emerald-600 scale-110' : 'text-slate-400 hover:text-slate-600'}`}><i className={`ph-fill ph-plus-circle text-3xl`}></i><span className="text-[11px] font-black uppercase tracking-tighter">Novo</span></button>
+                <button onClick={() => setView('history')} className={`flex flex-col items-center gap-1.5 p-2 transition-all active:scale-90 ${view === 'history' ? 'text-emerald-600 scale-110' : 'text-slate-400 hover:text-slate-600'}`}><i className={`ph-fill ph-clock-counter-clockwise text-3xl`}></i><span className="text-[11px] font-black uppercase tracking-tighter">Feed</span></button>
+                <div className="w-[1.5px] h-10 bg-slate-200 self-center"></div>
+                <button onClick={() => setView('admin')} className={`flex flex-col items-center gap-1.5 p-2 transition-all active:scale-90 ${view === 'admin' ? 'text-slate-900 scale-110' : 'text-slate-400 hover:text-slate-600'}`}><i className={`ph-fill ph-shield-check text-3xl`}></i><span className="text-[11px] font-black uppercase tracking-tighter">Gestor</span></button>
+            </nav>
+        </div>
+    );
 };
+
+export default App;
