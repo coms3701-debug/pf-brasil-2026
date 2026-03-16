@@ -5,7 +5,6 @@ import { getFirestore, collection, addDoc, onSnapshot, doc, deleteDoc } from 'fi
 
 // =============================================================
 // CONFIGURAÇÃO DO BANCO DE DADOS (FIREBASE GOOGLE)
-// TUDO NUM SÓ FICHEIRO PARA EVITAR ERROS DE IMPORTAÇÃO
 // =============================================================
 const firebaseConfig = {
     apiKey: "AIzaSyBSXiZWea-cXvztxKv28YggNOJioqsBobU",
@@ -22,6 +21,9 @@ const db = getFirestore(app);
 
 const COLLECTION_NAME = 'pf_budget_oficial_2026';
 
+// =============================================================
+// DADOS DO NEGÓCIO (LISTAS ATUALIZADAS)
+// =============================================================
 const TEAMS = [
     "DISTRITAL RIO TOTAL", "DISTRITAL MG/ES", "DISTRITAL NNE", "DISTRITAL SPC1", "DISTRITAL SPC2",
     "DISTRITAL SPI/BSB", "DISTRITAL SPI/GNY", "DISTRITAL SUL",
@@ -30,40 +32,25 @@ const TEAMS = [
 
 const REPRESENTATIVES = {
     "DISTRITAL RIO TOTAL": [
-        "CARLOS OTAVIO", 
-        "LIVIA NUNES DO AMARAL", 
-        "VALERIA DIAS DA COSTA", 
-        "THAIS SANTANNA RIBEIRO", 
-        "CARLOS EDUARDO DO NASCIMENTO SOARES",
-        "FERNANDA DE JESUS NASCIMENTO", 
-        "ARTHUR MARILAC FERREIRA", 
-        "ELIZABETH LIMA DA SILVA", 
-        "CARINA CARVALHO DIAS DE AMORIM",
-        "ROSIMERE MARIA DA SILVA FALCAO", 
-        "DEBORAH DE ALMEIDA LEITE PINTO DE LACERDA",
-        "ISIS DE OLIVEIRA ALVES", 
-        "PATRICIA MEIRE DE SOUZA IAMIM SILVA"
+        "CARLOS OTAVIO", "LIVIA NUNES DO AMARAL", "VALERIA DIAS DA COSTA", 
+        "THAIS SANTANNA RIBEIRO", "CARLOS EDUARDO DO NASCIMENTO SOARES",
+        "FERNANDA DE JESUS NASCIMENTO", "ARTHUR MARILAC FERREIRA", 
+        "ELIZABETH LIMA DA SILVA", "CARINA CARVALHO DIAS DE AMORIM",
+        "ROSIMERE MARIA DA SILVA FALCAO", "DEBORAH DE ALMEIDA LEITE PINTO DE LACERDA",
+        "ISIS DE OLIVEIRA ALVES", "PATRICIA MEIRE DE SOUZA IAMIM SILVA"
     ],
     "DISTRITAL MG/ES": [
-        "CALEBE MIRANDA WANDERLEY", 
-        "HELOISA DE BARROS",
-        "MARSEILLE COSTA DE CARVALHO", 
-        "AMANDA DE OLIVEIRA MOURA",
-        "IZABELA SALES ROCHA DELUCCA", 
-        "PAULO MARCIO TOFANI DE MELLO JUNIOR", 
-        "KENIA OLIVEIRA CANHESTRO",
+        "CALEBE MIRANDA WANDERLEY", "HELOISA DE BARROS", "MARSEILLE COSTA DE CARVALHO", 
+        "AMANDA DE OLIVEIRA MOURA", "IZABELA SALES ROCHA DELUCCA", 
+        "PAULO MARCIO TOFANI DE MELLO JUNIOR", "KENIA OLIVEIRA CANHESTRO",
         "KELLY CRISTINA PEREIRA DE ARAUJO"
     ],
     "DISTRITAL NNE": [
-        "SUELLEN VASCONCELOS", 
-        "LEILA MARIA BRIZENO ALVES SETUBAL", 
-        "JOSE BERNARDO SOUZA SILVA OLIVEIRA",
-        "ANA ROSA FERREIRA DE MELO VENTURA",
-        "RICARDO JOSE COELHO DE ALBUQUERQUE", 
-        "MARCIA CATERINE MELO LIMA DA ROCHA",
+        "SUELLEN VASCONCELOS", "LEILA MARIA BRIZENO ALVES SETUBAL", 
+        "JOSE BERNARDO SOUZA SILVA OLIVEIRA", "ANA ROSA FERREIRA DE MELO VENTURA",
+        "RICARDO JOSE COELHO DE ALBUQUERQUE", "MARCIA CATERINE MELO LIMA DA ROCHA",
         "FABIANA CRISTINA PINTO TETI MAGALHAES DE MORAES", 
-        "FLAVIA MARIA CAVALCANTI MADUREIRA",
-        "KALIANNE FELIX", "LUIS PINHEIRO", 
+        "FLAVIA MARIA CAVALCANTI MADUREIRA", "KALIANNE FELIX", "LUIS PINHEIRO"
     ],
     "DISTRITAL SPC1": [
         "SIDNEI DE SANTIS", "VAGO VM", "PAULA NERY ARAGAO", "VALDIRENE COSME DA CONCEICAO DE FLOR",
@@ -86,19 +73,13 @@ const REPRESENTATIVES = {
         "BRUNO CAETANO FELIX", "CLAYLTON DE SOUZA", "KELLY FABIANE DA SILVA"
     ],
     "DISTRITAL SPI/GNY": [
-        "JACQUELINE MENEZES", 
-        "LINDA LUCIA DE SOUSA ALVES OLIVEIRA", 
-        "LADY MARY DE SOUZA ALMEIDA LINHARES",
-        "PAOLA FERNANDA DA SILVA MOSCOSO DE BARROS", 
-        "VERA ALICE BEVEVINO DIAS DE MORAES RIGHETI",
-        "CLARISSA GUTTIERREZ", 
-        "SILVIA HILARIO SANTOS", 
-        "GIOVANA SALAB DEPOLLI",
-        "ARYADINE CARDOSO DE SOUZA", 
-        "ANTONIO MARCOS SHIMAZAKI DA SILVA", 
-        "DANIEL STEFANI DO NASCIMENTO",
-        "JANAINA BEMMUYAL PARENTE SANTOS", 
-        "SANDRINE AGNES LUCIE YOUST"    ],
+        "JACQUELINE MENEZES", "LINDA LUCIA DE SOUSA ALVES OLIVEIRA", 
+        "LADY MARY DE SOUZA ALMEIDA LINHARES", "PAOLA FERNANDA DA SILVA MOSCOSO DE BARROS", 
+        "VERA ALICE BEVEVINO DIAS DE MORAES RIGHETI", "CLARISSA GUTTIERREZ", 
+        "SILVIA HILARIO SANTOS", "GIOVANA SALAB DEPOLLI", "ARYADINE CARDOSO DE SOUZA", 
+        "ANTONIO MARCOS SHIMAZAKI DA SILVA", "DANIEL STEFANI DO NASCIMENTO",
+        "JANAINA BEMMUYAL PARENTE SANTOS", "SANDRINE AGNES LUCIE YOUST"    
+    ],
     "DISTRITAL SUL": [
         "MARIANE GONCALVES", "LIEDER VARELA DIAS", "IZADORA GIMENES QUEVEDO",
         "TATIANA RODRIGUES DA FONSECA", "MEIRE TEREZINHA LEMES FERNANDES", "LAURO FERREIRA JUNIOR",
@@ -139,18 +120,20 @@ const App = () => {
     const [adminGeneralFilter, setAdminGeneralFilter] = useState('ALL');
     const [deleteTarget, setDeleteTarget] = useState(null);
 
-    const [budgetCeiling, setBudgetCeilingState] = useState(() => {
-        try { return localStorage.getItem('pf_budget_ceiling') || ''; } catch(e) { return ''; }
-    });
-    
-    const setBudgetCeiling = (val) => {
-        setBudgetCeilingState(val);
-        try { localStorage.setItem('pf_budget_ceiling', val); } catch(e) {}
-    };
-
+    // =========================================================================
+    // GESTÃO SEGURA DE MEMÓRIA
+    // =========================================================================
     const [teamBudgets, setTeamBudgets] = useState(() => {
-        try { return JSON.parse(localStorage.getItem('pf_team_budgets')) || {}; } catch (e) { return {}; }
+        try { return JSON.parse(localStorage.getItem('pf_team_budgets')) || {}; } 
+        catch (e) { return {}; }
     });
+
+    const handleBudgetChange = (val) => {
+        if (!currentFeedTeam || currentFeedTeam === 'ALL') return;
+        const newBudgets = { ...teamBudgets, [currentFeedTeam]: val };
+        setTeamBudgets(newBudgets);
+        try { localStorage.setItem('pf_team_budgets', JSON.stringify(newBudgets)); } catch(e) {}
+    };
 
     const [formData, setFormData] = useState(() => {
         let t = '', r = '';
@@ -158,9 +141,7 @@ const App = () => {
             t = localStorage.getItem('pf_user_team') || '';
             r = localStorage.getItem('pf_user_name') || '';
         } catch(e) {}
-        return {
-            team: t, requesterName: r, doctorName: '', crm: '', category: '', actionType: '', value: '', observations: ''
-        };
+        return { team: t, requesterName: r, doctorName: '', crm: '', category: '', actionType: '', value: '', observations: '' };
     });
 
     useEffect(() => {
@@ -170,39 +151,19 @@ const App = () => {
         } catch (e) {}
     }, [formData.team, formData.requesterName]);
 
-    // Ícone Dinâmico
-    useEffect(() => {
-        try {
-            const canvas = document.createElement('canvas');
-            canvas.width = 1024; canvas.height = 1024;
-            const ctx = canvas.getContext('2d');
-            if (ctx) {
-                const grad = ctx.createLinearGradient(0, 0, 1024, 1024);
-                grad.addColorStop(0, '#059669'); grad.addColorStop(1, '#10b981');
-                ctx.fillStyle = grad;
-                ctx.beginPath(); ctx.roundRect(0, 0, 1024, 1024, 200); ctx.fill();
-                ctx.fillStyle = 'white'; ctx.font = 'italic bold 550px serif';
-                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-                ctx.fillText('PF', 512, 512 + 40);
-                const iconUrl = canvas.toDataURL('image/png');
-                let link = document.querySelector('link[rel="apple-touch-icon"]') || document.createElement('link');
-                link.rel = 'apple-touch-icon'; link.href = iconUrl; document.head.appendChild(link);
-            }
-        } catch(e) {}
-    }, []);
-
     const notify = useCallback((msg, type = 'success') => {
         setStatus({ type, msg });
         setTimeout(() => setStatus({ type: '', msg: '' }), 4000);
     }, []);
 
-    // Firebase Login 
+    // =========================================================================
+    // FIREBASE AUTH & FETCH (BLINDADO)
+    // =========================================================================
     useEffect(() => {
         signInAnonymously(auth).catch(() => notify("Erro de ligação", "error"));
         return onAuthStateChanged(auth, setUser);
     }, [notify]);
 
-    // Firebase Data Fetch 
     useEffect(() => {
         if (!user) return;
         setLoading(true);
@@ -213,11 +174,8 @@ const App = () => {
                     const d = doc.data();
                     let date = new Date();
                     if (d.createdAt) {
-                        if (typeof d.createdAt.toDate === 'function') {
-                            date = d.createdAt.toDate();
-                        } else {
-                            date = new Date(d.createdAt);
-                        }
+                        if (typeof d.createdAt.toDate === 'function') date = d.createdAt.toDate();
+                        else date = new Date(d.createdAt);
                     }
                     return { id: doc.id, ...d, createdAt: date };
                 });
@@ -231,23 +189,24 @@ const App = () => {
         return () => unsubscribe();
     }, [user]);
 
+    // =========================================================================
+    // CÁLCULOS E FILTROS 
+    // =========================================================================
     const parseCurrency = useCallback((valStr) => {
         if (!valStr) return 0;
         return parseFloat(String(valStr).replace(/\./g, '').replace(',', '.')) || 0;
     }, []);
 
-    const formatDate = (dateObj) => {
-        try {
-            if (dateObj && typeof dateObj.toLocaleDateString === 'function') {
-                return dateObj.toLocaleDateString('pt-BR');
-            }
-            return '';
-        } catch (e) { return ''; }
-    };
-
     const formatValueInput = (val) => {
         let v = String(val || "").replace(/\D/g, "");
         return (Number(v) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    };
+
+    const formatDate = (dateObj) => {
+        try {
+            if (dateObj && typeof dateObj.toLocaleDateString === 'function') return dateObj.toLocaleDateString('pt-BR');
+            return '';
+        } catch (e) { return ''; }
     };
 
     const currentFeedTeam = useMemo(() => {
@@ -271,13 +230,6 @@ const App = () => {
             return teamBudgets[currentFeedTeam] || '';
         } catch(e) { return ''; }
     }, [currentFeedTeam, teamBudgets, parseCurrency]);
-
-    const handleBudgetChange = (val) => {
-        if (!currentFeedTeam || currentFeedTeam === 'ALL') return;
-        const newBudgets = { ...teamBudgets, [currentFeedTeam]: val };
-        setTeamBudgets(newBudgets);
-        try { localStorage.setItem('pf_team_budgets', JSON.stringify(newBudgets)); } catch(e) {}
-    };
 
     const filteredEntriesAdmin = useMemo(() => {
         try {
@@ -309,6 +261,9 @@ const App = () => {
         catch(e) { return 0; }
     }, [displayBudgetCeiling, totalUsedFeed]);
 
+    // =========================================================================
+    // EXPORTAR EXCEL
+    // =========================================================================
     const exportToCSV = () => {
         try {
             const dataToExport = currentAdmin ? filteredEntriesAdmin : feedEntries;
@@ -335,6 +290,9 @@ const App = () => {
         } catch (err) { notify("Falha ao exportar", "error"); }
     };
 
+    // =========================================================================
+    // RANKINGS
+    // =========================================================================
     const feedStatsByRep = useMemo(() => {
         try {
             const groups = feedEntries.reduce((acc, curr) => {
@@ -407,6 +365,9 @@ const App = () => {
         } catch(e) { return []; }
     }, [filteredEntriesAdmin, parseCurrency]);
 
+    // =========================================================================
+    // EVENTOS DO FORMULÁRIO E ADMIN
+    // =========================================================================
     const handleSubmit = async (e) => {
         e.preventDefault();
         const { team, requesterName, doctorName, value, observations, crm, category, actionType } = formData;
@@ -460,11 +421,13 @@ const App = () => {
     return (
         <div className="min-h-screen bg-slate-100 pb-24 text-slate-900 font-sans">
             
+            {/* MODAL DE SEGURANÇA NA EXCLUSÃO */}
             {deleteTarget && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 animate-in fade-in duration-200">
                     <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setDeleteTarget(null)}></div>
                     <div className="relative bg-white w-full max-sm:rounded-3xl rounded-[2.5rem] shadow-2xl p-8 animate-in zoom-in-95 border border-slate-100 text-center">
-                        <i className="ph-fill ph-warning-octagon text-rose-600 text-5xl mb-4"></i>
+                        {/* Como estamos sem import de ícones aqui, usamos um emoji para o modal de forma segura */}
+                        <div className="text-5xl mb-4">⚠️</div>
                         <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Confirmar Exclusão?</h3>
                         <p className="text-sm text-slate-500 my-4 px-2 italic">Excluir lançamento de <strong className="text-slate-800">{deleteTarget.doctorName}</strong>?</p>
                         <div className="space-y-3">
@@ -484,21 +447,24 @@ const App = () => {
                             <p className="text-[10px] text-emerald-400 font-bold tracking-[0.3em] uppercase mt-1">Corporate Brasil</p>
                         </div>
                     </div>
-                    <i className="ph-bold ph-file-csv text-emerald-400 text-2xl active:scale-90 transition-all cursor-pointer hover:text-emerald-300" onClick={exportToCSV} title="Exportar para Excel"></i>
+                    <button onClick={exportToCSV} className="bg-slate-800 text-emerald-400 font-bold py-2 px-3 rounded-lg text-xs uppercase tracking-wider active:scale-90 transition-all border border-slate-700">
+                        Exportar CSV
+                    </button>
                 </div>
             </header>
 
             {status.msg && (
-                <div className="fixed top-24 left-1/2 -translate-x-1/2 z-50 bg-emerald-900 text-emerald-100 px-6 py-3 rounded-full shadow-2xl border border-emerald-700 font-bold text-xs animate-bounce uppercase">
+                <div className="fixed top-24 left-1/2 -translate-x-1/2 z-50 bg-emerald-900 text-emerald-100 px-6 py-3 rounded-full shadow-2xl border border-emerald-700 font-bold text-xs animate-bounce uppercase text-center w-3/4 max-w-xs">
                     {status.msg}
                 </div>
             )}
 
             <main className="max-w-md mx-auto p-4">
+                {/* ======================= ABA NOVO ======================= */}
                 {view === 'form' && (
                     <div className="bg-white rounded-[2rem] p-7 shadow-2xl border border-slate-100 animate-in fade-in zoom-in-95">
                         <h2 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] mb-7 flex items-center gap-2">
-                            <i className="ph-bold ph-plus-circle text-emerald-500 text-lg"></i> Nova Solicitação
+                            Nova Solicitação
                         </h2>
                         <form onSubmit={handleSubmit} className="space-y-5">
                             
@@ -564,12 +530,13 @@ const App = () => {
                             <textarea value={formData.observations} onChange={e => setFormData({...formData, observations: e.target.value})} placeholder="DETALHE A AÇÃO AQUI..." rows="3" className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl text-sm font-medium outline-none focus:border-emerald-500 transition-all uppercase placeholder:text-slate-400" />
                             
                             <button type="submit" className="w-full bg-slate-900 text-white font-black py-5 rounded-2xl shadow-2xl active:scale-[0.96] transition-all flex items-center justify-center gap-2 uppercase text-sm tracking-widest mt-4">
-                                <i className="ph-bold ph-check-circle text-emerald-400 text-xl"></i> Registrar solicitação
+                                Registrar solicitação
                             </button>
                         </form>
                     </div>
                 )}
 
+                {/* ======================= ABA FEED ======================= */}
                 {view === 'history' && (
                     <div className="space-y-5 animate-in slide-in-from-bottom-4 duration-500 pb-10">
                         
@@ -595,7 +562,7 @@ const App = () => {
                                     <h4 className="text-2xl font-black tracking-tight">R$ {Number(totalUsedFeed).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h4>
                                 </div>
                                 <div className="text-right">
-                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">Registos</p>
+                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">Registros</p>
                                     <h4 className="text-2xl font-black text-slate-300">{feedEntries.length}</h4>
                                 </div>
                             </div>
@@ -681,7 +648,6 @@ const App = () => {
                         
                         {feedEntries.length === 0 ? (
                             <div className="bg-white p-10 rounded-3xl text-center border border-dashed border-slate-300">
-                                <i className="ph-fill ph-warning-circle text-4xl text-slate-300 mb-3"></i>
                                 <p className="text-xs font-black text-slate-400 uppercase tracking-widest leading-relaxed">
                                     {!formData.requesterName && !currentAdmin
                                         ? "Selecione seu nome na aba NOVO para visualizar."
@@ -696,9 +662,16 @@ const App = () => {
                                         <h3 className="font-bold text-slate-800 text-sm truncate mt-2 uppercase leading-tight">{String(e.doctorName || '')}</h3>
                                         <p className="text-[11px] text-slate-500 font-bold uppercase truncate opacity-70 mt-0.5">{String(e.requesterName || '')} • {String(e.actionType || '')}</p>
                                     </div>
-                                    <div className="text-right shrink-0">
+                                    <div className="text-right shrink-0 flex flex-col items-end">
                                         <p className="font-black text-slate-900 text-sm uppercase tracking-tighter">R$ {String(e.value || '0,00')}</p>
                                         <p className="text-[10px] text-slate-400 font-bold mt-1">{formatDate(e.createdAt)}</p>
+                                        
+                                        {/* Botão de excluir para o usuário que criou o lançamento na visão "Feed" */}
+                                        {!currentAdmin && e.userId === user?.uid && (
+                                            <button onClick={() => setDeleteTarget(e)} className="mt-3 bg-rose-50 text-rose-600 font-bold py-1 px-2 rounded text-[10px] uppercase active:scale-90 transition-all border border-rose-100">
+                                                Excluir
+                                            </button>
+                                        )}
                                     </div>
                                 </div>
                             ))
@@ -706,14 +679,15 @@ const App = () => {
                     </div>
                 )}
 
+                {/* ======================= ABA GESTOR ======================= */}
                 {view === 'admin' && (
                     <div className="animate-in fade-in duration-500">
                         {!currentAdmin ? (
                             <div className="bg-white p-10 rounded-[2.5rem] shadow-2xl text-center border border-slate-100 mt-10">
-                                <div className="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner"><i className="ph-fill ph-shield-check text-5xl"></i></div>
+                                <div className="text-5xl mb-4">🛡️</div>
                                 <h2 className="text-2xl font-black text-slate-800 mb-2 tracking-tight uppercase">Portal do Gestor</h2>
-                                <p className="text-xs text-slate-400 font-bold mt-2">Área restrita à liderança.</p>
-                                <form onSubmit={handleAdminLogin} className="space-y-6 mt-8">
+                                <p className="text-xs text-slate-400 font-bold mt-2 mb-8">Área restrita à liderança.</p>
+                                <form onSubmit={handleAdminLogin} className="space-y-6">
                                     <input type="password" value={pinInput} onChange={e => setPinInput(e.target.value)} placeholder="PIN" className="w-full p-5 bg-slate-100 rounded-2xl text-center text-4xl font-black tracking-[0.5em] outline-none border-2 border-transparent focus:border-emerald-500 uppercase shadow-inner transition-all" maxLength={6} />
                                     <button type="submit" className="w-full bg-slate-900 text-white font-black py-5 rounded-2xl shadow-xl uppercase text-sm tracking-widest active:scale-95 transition-all">Acessar Painel</button>
                                 </form>
@@ -751,7 +725,7 @@ const App = () => {
                                         {/* RANKING: TOTAL POR DISTRITAL (EXCLUSIVO ADMIN GERAL) */}
                                         {currentAdmin.isGeneral && (
                                             <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100">
-                                                <h3 className="text-[10px] font-black text-slate-800 uppercase tracking-[0.2em] mb-6 flex items-center gap-2"><i className="ph-bold ph-map-pin text-emerald-500 text-lg"></i> Total por Distrital</h3>
+                                                <h3 className="text-[10px] font-black text-slate-800 uppercase tracking-[0.2em] mb-6 flex items-center gap-2">Total por Distrital</h3>
                                                 <div className="space-y-4 max-h-64 overflow-y-auto pr-2">
                                                     {statsByTeam.map((s, i) => (
                                                         <div key={i} className="space-y-2 animate-in slide-in-from-left-2 duration-300 border-b border-slate-50 pb-2 last:border-0">
@@ -769,7 +743,10 @@ const App = () => {
                                     </div>
                                 ) : (
                                     <div className="space-y-5 animate-in slide-in-from-left-4 duration-300">
-                                        <div className="bg-rose-50 border border-rose-100 p-5 rounded-2xl flex gap-3 shadow-sm italic text-rose-700 text-xs font-bold uppercase leading-tight items-center"><i className="ph-fill ph-warning-circle text-rose-500 text-2xl shrink-0"></i>Moderação Ativa: Cuidado, a exclusão é permanente.</div>
+                                        <div className="bg-rose-50 border border-rose-100 p-5 rounded-2xl flex gap-3 shadow-sm italic text-rose-700 text-xs font-bold uppercase leading-tight items-center">
+                                            <div className="text-xl mr-2">⚠️</div>
+                                            Moderação Ativa: Cuidado, a exclusão é permanente.
+                                        </div>
                                         {filteredEntriesAdmin.map(e => (
                                             <div key={e.id} className="bg-white p-5 rounded-2xl shadow-md border border-slate-100 flex justify-between items-center active:scale-[0.98] transition-all">
                                                 <div className="min-w-0 pr-4 text-left">
@@ -777,7 +754,9 @@ const App = () => {
                                                     <h3 className="font-bold text-slate-800 text-sm truncate uppercase leading-tight">{String(e.doctorName || '')}</h3>
                                                     <p className="text-[11px] text-slate-500 font-bold uppercase truncate opacity-70 mt-0.5">R$ {String(e.value || '0,00')} • {String(e.requesterName || '')}</p>
                                                 </div>
-                                                <button onClick={() => setDeleteTarget(e)} className="w-12 h-12 bg-rose-50 text-rose-600 rounded-2xl flex items-center justify-center shadow-sm active:scale-90 border border-rose-100 transition-all"><i className="ph-bold ph-trash text-xl"></i></button>
+                                                <button onClick={() => setDeleteTarget(e)} className="bg-rose-50 text-rose-600 font-bold py-2 px-3 rounded-xl shadow-sm active:scale-90 border border-rose-100 transition-all uppercase text-[10px]">
+                                                    Excluir
+                                                </button>
                                             </div>
                                         ))}
                                     </div>
@@ -789,12 +768,11 @@ const App = () => {
             </main>
 
             <nav className="fixed bottom-0 w-full bg-white/95 backdrop-blur-md border-t border-slate-200 flex justify-around p-4 z-50 shadow-[0_-15px_40px_rgba(0,0,0,0.1)]">
-                <button onClick={() => setView('form')} className={`flex flex-col items-center gap-1.5 p-2 transition-all active:scale-90 ${view === 'form' ? 'text-emerald-600 scale-110' : 'text-slate-400 hover:text-slate-600'}`}><i className={`ph-fill ph-plus-circle text-3xl`}></i><span className="text-[11px] font-black uppercase tracking-tighter">Novo</span></button>
-                <button onClick={() => setView('history')} className={`flex flex-col items-center gap-1.5 p-2 transition-all active:scale-90 ${view === 'history' ? 'text-emerald-600 scale-110' : 'text-slate-400 hover:text-slate-600'}`}><i className={`ph-fill ph-clock-counter-clockwise text-3xl`}></i><span className="text-[11px] font-black uppercase tracking-tighter">Feed</span></button>
+                <button onClick={() => setView('form')} className={`flex flex-col items-center gap-1.5 p-2 transition-all active:scale-90 ${view === 'form' ? 'text-emerald-600 scale-110' : 'text-slate-400 hover:text-slate-600'}`}><span className="text-2xl mb-1">➕</span><span className="text-[11px] font-black uppercase tracking-tighter">Novo</span></button>
+                <button onClick={() => setView('history')} className={`flex flex-col items-center gap-1.5 p-2 transition-all active:scale-90 ${view === 'history' ? 'text-emerald-600 scale-110' : 'text-slate-400 hover:text-slate-600'}`}><span className="text-2xl mb-1">📋</span><span className="text-[11px] font-black uppercase tracking-tighter">Feed</span></button>
                 <div className="w-[1.5px] h-10 bg-slate-200 self-center"></div>
-                <button onClick={() => setView('admin')} className={`flex flex-col items-center gap-1.5 p-2 transition-all active:scale-90 ${view === 'admin' ? 'text-slate-900 scale-110' : 'text-slate-400 hover:text-slate-600'}`}><i className={`ph-fill ph-shield-check text-3xl`}></i><span className="text-[11px] font-black uppercase tracking-tighter">Gestor</span></button>
+                <button onClick={() => setView('admin')} className={`flex flex-col items-center gap-1.5 p-2 transition-all active:scale-90 ${view === 'admin' ? 'text-slate-900 scale-110' : 'text-slate-400 hover:text-slate-600'}`}><span className="text-2xl mb-1">🛡️</span><span className="text-[11px] font-black uppercase tracking-tighter">Gestor</span></button>
             </nav>
         </div>
     );
 };
-
