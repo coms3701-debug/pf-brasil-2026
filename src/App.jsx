@@ -37,7 +37,7 @@ const REPRESENTATIVES = {
         "ISIS DE OLIVEIRA ALVES", "PATRICIA MEIRE DE SOUZA IAMIM SILVA"
     ],
     "DISTRITAL MG/ES": [
-        "LUIZ SOUZA", "CALEBE MIRANDA WANDERLEY", "HELOISA DE BARROS", "MARSEILLE COSTA DE CARVALHO", 
+        "CALEBE MIRANDA WANDERLEY", "HELOISA DE BARROS", "MARSEILLE COSTA DE CARVALHO", 
         "AMANDA DE OLIVEIRA MOURA", "IZABELA SALES ROCHA DELUCCA", 
         "PAULO MARCIO TOFANI DE MELLO JUNIOR", "KENIA OLIVEIRA CANHESTRO",
         "KELLY CRISTINA PEREIRA DE ARAUJO"
@@ -51,7 +51,7 @@ const REPRESENTATIVES = {
     ],
     "DISTRITAL SPC1": [
         "SIDNEI DE SANTIS", "VAGO VM", "PAULA NERY ARAGAO", "VALDIRENE COSME DA CONCEICAO DE FLOR",
-        "KARINA PEREIRA SILVA ACTIS", "RAFAEL MENDES PEREIRA", "GABRIELA ARAUJO DE PIERI ZAMPIERI",
+        "KARINA PEREIRA SILVA ACTIS", "RAFAEL MENDES PEREIRA", "MONIQUE CAROLINA MARTINS GONCALVES",
         "ROBERTA SALES GADELHA", "SHEILA SANTANA FULNAZARI", "GRAZIELA VICENTE TORRECILLAS",
         "PAMELA ARAUJO DA COSTA"
     ],
@@ -89,9 +89,9 @@ const REPRESENTATIVES = {
 
 const ACTION_TYPES = [
     'DIAS DE PRODUTO', 'PRESENTE', 'REFEIÇÃO', 'CONGRESSOS', 
-    'ORGANIZAÇÃO DE AMOSTRAS', 'MINI MEETING', 'EVENTOS', 'COMPRA DE ORIGINAIS', 'MATERIAL GRÁFICO'];
-
-const CATEGORIES = ['CAT 1', 'CAT 2', 'CAT 3', 'CAT 4', 'CAT 5','NÃO SE APLICA' ];
+    'ORGANIZAÇÃO DE AMOSTRAS', 'MINI MEETING', 'EVENTOS', 'COMPRA DE ORIGINAIS'
+];
+const CATEGORIES = ['CAT 1', 'CAT 2', 'CAT 3', 'CAT 4'];
 
 const ADMIN_USERS = {
     "8888": { name: "CARLOS OTÁVIO", isGeneral: true, team: "DIRETORIA (MATRIZ)" },
@@ -106,7 +106,7 @@ const ADMIN_USERS = {
 };
 
 // =========================================================================
-// COMPONENTE: TOUCH SELECT (MENU SUSPENSO COM VIBRAÇÃO E DESTAQUE)
+// COMPONENTE: TOUCH SELECT
 // =========================================================================
 const TouchSelect = ({ name, value, onChange, options, placeholder }) => {
     const [isOpen, setIsOpen] = useState(false);
@@ -125,7 +125,6 @@ const TouchSelect = ({ name, value, onChange, options, placeholder }) => {
         if (!el || !isOpen) return;
 
         const handleTouchMove = (e) => {
-            // MÁGICA AQUI: Bloqueia o scroll nativo do iPhone e foca só no deslizar do dedo
             e.preventDefault(); 
             if (e.touches.length !== 1) return;
             
@@ -146,7 +145,6 @@ const TouchSelect = ({ name, value, onChange, options, placeholder }) => {
             }
         };
 
-        // { passive: false } é obrigatório no iOS para a trava (preventDefault) funcionar perfeitamente
         el.addEventListener('touchmove', handleTouchMove, { passive: false });
         return () => el.removeEventListener('touchmove', handleTouchMove);
     }, [isOpen]);
@@ -207,7 +205,7 @@ const TouchSelect = ({ name, value, onChange, options, placeholder }) => {
 };
 
 // =========================================================================
-// COMPONENTE: SWIPEABLE ENTRY (ARRASTAR PARA EDITAR/EXCLUIR)
+// COMPONENTE: SWIPEABLE ENTRY 
 // =========================================================================
 const SwipeableEntry = ({ entry, onEdit, onDelete, currentAdmin, adminGeneralFilter }) => {
     const [startX, setStartX] = useState(0);
@@ -223,7 +221,6 @@ const SwipeableEntry = ({ entry, onEdit, onDelete, currentAdmin, adminGeneralFil
         const diffX = e.touches[0].clientX - startX;
         const diffY = e.touches[0].clientY - startY;
         
-        // Bloqueia o swipe horizontal se estivermos a fazer scroll na vertical
         if (Math.abs(diffY) > Math.abs(diffX)) return;
         
         if (diffX > 120) setOffsetX(120);
@@ -233,19 +230,20 @@ const SwipeableEntry = ({ entry, onEdit, onDelete, currentAdmin, adminGeneralFil
     
     const handleEnd = () => {
         if (offsetX > 70) {
-            onEdit(entry); // Swipe Direita (Editar)
+            onEdit(entry); 
             if (navigator.vibrate) navigator.vibrate(20);
         }
         else if (offsetX < -70) {
-            onDelete(entry); // Swipe Esquerda (Excluir)
+            onDelete(entry); 
             if (navigator.vibrate) navigator.vibrate(20);
         }
-        setOffsetX(0); // Volta à posição original
+        setOffsetX(0); 
     };
+
+    const formattedActionDate = entry.actionDate ? new Date(entry.actionDate + 'T12:00:00').toLocaleDateString('pt-BR') : '';
 
     return (
         <div className="relative rounded-2xl overflow-hidden mb-3 bg-slate-200 border border-slate-200">
-            {/* Ações de Fundo */}
             <div className="absolute inset-0 flex justify-between items-center px-5">
                 <div className={`font-black flex items-center gap-2 transition-opacity duration-200 ${offsetX > 0 ? 'opacity-100 text-emerald-600' : 'opacity-0'}`}>
                     <span className="text-2xl">✏️</span> EDITAR
@@ -255,7 +253,6 @@ const SwipeableEntry = ({ entry, onEdit, onDelete, currentAdmin, adminGeneralFil
                 </div>
             </div>
 
-            {/* Cartão de Superfície */}
             <div 
                 onTouchStart={handleStart}
                 onTouchMove={handleMove}
@@ -269,6 +266,11 @@ const SwipeableEntry = ({ entry, onEdit, onDelete, currentAdmin, adminGeneralFil
                         {currentAdmin && currentAdmin.isGeneral && adminGeneralFilter === 'ALL' && (
                             <span className="text-[8px] bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded uppercase font-bold">{entry.team}</span>
                         )}
+                        {formattedActionDate && (
+                            <span className="text-[8px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded uppercase font-bold ml-auto border border-slate-200">
+                                📅 {formattedActionDate}
+                            </span>
+                        )}
                     </div>
                     <p className="font-bold text-slate-800 text-sm truncate">{entry.doctorName} <span className="text-slate-400 font-normal ml-1">({entry.category})</span></p>
                     <p className="text-xs font-semibold text-slate-600 mt-1">R$ {entry.value} - <span className="font-normal text-slate-500">{entry.actionType}</span></p>
@@ -278,7 +280,6 @@ const SwipeableEntry = ({ entry, onEdit, onDelete, currentAdmin, adminGeneralFil
         </div>
     );
 };
-
 
 // =========================================================================
 // APLICATIVO PRINCIPAL
@@ -291,19 +292,14 @@ export default function App() {
     const [status, setStatus] = useState({ type: '', msg: '' });
     const [showSuccessPopup, setShowSuccessPopup] = useState(false);
     
-    // Admin States
     const [currentAdmin, setCurrentAdmin] = useState(null);
     const [pinInput, setPinInput] = useState('');
     const [adminTab, setAdminTab] = useState('reports'); 
     const [adminGeneralFilter, setAdminGeneralFilter] = useState('ALL');
     
-    // Edição e Exclusão
     const [deleteTarget, setDeleteTarget] = useState(null);
-    const [editingEntry, setEditingEntry] = useState(null); // Estado para edição
+    const [editingEntry, setEditingEntry] = useState(null); 
 
-    // =========================================================================
-    // ÍCONE DINÂMICO PWA (IPHONE)
-    // =========================================================================
     useEffect(() => {
         try {
             const canvas = document.createElement('canvas');
@@ -311,8 +307,8 @@ export default function App() {
             const ctx = canvas.getContext('2d');
             if (ctx) {
                 const grad = ctx.createLinearGradient(0, 0, 1024, 1024);
-                grad.addColorStop(0, '#059669'); // emerald-600
-                grad.addColorStop(1, '#10b981'); // emerald-500
+                grad.addColorStop(0, '#059669'); 
+                grad.addColorStop(1, '#10b981'); 
                 ctx.fillStyle = grad;
                 ctx.beginPath(); 
                 ctx.roundRect(0, 0, 1024, 1024, 200); 
@@ -353,7 +349,7 @@ export default function App() {
             t = localStorage.getItem('pf_user_team') || '';
             r = localStorage.getItem('pf_user_name') || '';
         } catch(e) {}
-        return { team: t, requesterName: r, doctorName: '', crm: '', category: '', actionType: '', value: '', observations: '' };
+        return { team: t, requesterName: r, actionDate: '', doctorName: '', crm: '', category: '', actionType: '', value: '', observations: '' };
     });
 
     useEffect(() => {
@@ -368,7 +364,6 @@ export default function App() {
         setTimeout(() => setStatus({ type: '', msg: '' }), 4000);
     }, []);
 
-    // FIREBASE INIT
     useEffect(() => {
         signInAnonymously(auth).catch(() => notify("Erro de ligação", "error"));
         return onAuthStateChanged(auth, setUser);
@@ -399,7 +394,6 @@ export default function App() {
         return () => unsubscribe();
     }, [user]);
 
-    // CÁLCULOS E FILTROS
     const parseCurrency = useCallback((valStr) => {
         if (!valStr) return 0;
         return parseFloat(String(valStr).replace(/\./g, '').replace(',', '.')) || 0;
@@ -474,11 +468,12 @@ export default function App() {
             const dataToExport = currentAdmin ? filteredEntriesAdmin : feedEntries;
             if (dataToExport.length === 0) return notify("Não existem dados para exportar.", "error");
 
-            const headers = ["Data", "Estrutura", "Solicitante", "Medico/Destinatario", "CRM", "Categoria", "Acao", "Valor", "Observacoes"];
+            const headers = ["Data Insercao", "Data da Acao", "Estrutura", "Solicitante", "Medico/Destinatario", "CRM", "Categoria", "Acao", "Valor", "Observacoes"];
             const rows = dataToExport.map(e => {
-                const date = formatDate(e.createdAt);
+                const dateIns = formatDate(e.createdAt);
+                const actionDateExport = e.actionDate ? new Date(e.actionDate + 'T12:00:00').toLocaleDateString('pt-BR') : '';
                 const obs = String(e.observations || "").replace(/"/g, '""').replace(/\n/g, ' '); 
-                return [`"${date}"`,`"${e.team || ''}"`,`"${e.requesterName || ''}"`,`"${e.doctorName || ''}"`,`"${e.crm || ''}"`,`"${e.category || ''}"`,`"${e.actionType || ''}"`,`"${e.value || ''}"`,`"${obs}"`].join(";");
+                return [`"${dateIns}"`,`"${actionDateExport}"`,`"${e.team || ''}"`,`"${e.requesterName || ''}"`,`"${e.doctorName || ''}"`,`"${e.crm || ''}"`,`"${e.category || ''}"`,`"${e.actionType || ''}"`,`"${e.value || ''}"`,`"${obs}"`].join(";");
             });
 
             const csvString = [headers.join(";"), ...rows].join("\n");
@@ -495,7 +490,6 @@ export default function App() {
         } catch (err) { notify("Falha ao exportar", "error"); }
     };
 
-    // RANKINGS
     const feedStatsByRep = useMemo(() => {
         try {
             const groups = feedEntries.reduce((acc, curr) => {
@@ -568,7 +562,6 @@ export default function App() {
         } catch(e) { return []; }
     }, [filteredEntriesAdmin, parseCurrency]);
 
-    // EVENTOS
     const handleInputChange = (e) => {
         const { name, value } = e.target;
         if (name === 'team') {
@@ -595,15 +588,15 @@ export default function App() {
         e.preventDefault();
         if (!user) return alert("Aguarde a ligação ao servidor");
         
-        const { team, requesterName, doctorName, value, observations, crm, category, actionType } = formData;
-        if (!team || !requesterName || !doctorName || !value || !crm || !category || !actionType) {
+        const { team, requesterName, actionDate, doctorName, value, observations, crm, category, actionType } = formData;
+        if (!team || !requesterName || !actionDate || !doctorName || !value || !crm || !category || !actionType) {
             return alert("Preencha todos os campos obrigatórios.");
         }
         try {
             await addDoc(collection(db, COLLECTION_NAME), { ...formData, userId: user.uid, createdAt: new Date() });
-            setFormData({ ...formData, doctorName: '', crm: '', value: '', observations: '', category: '', actionType: '' }); 
+            setFormData({ ...formData, actionDate: '', doctorName: '', crm: '', value: '', observations: '', category: '', actionType: '' }); 
             
-            if (navigator.vibrate) navigator.vibrate([30, 50, 30, 50, 30]); // Vibração de Sucesso dupla
+            if (navigator.vibrate) navigator.vibrate([30, 50, 30, 50, 30]); 
             setShowSuccessPopup(true);
             setTimeout(() => { setShowSuccessPopup(false); }, 3500); 
             setView('history');
@@ -612,13 +605,13 @@ export default function App() {
 
     const handleEditSubmit = async (e) => {
         e.preventDefault();
-        const { team, requesterName, doctorName, value, crm, category, actionType } = editingEntry;
-        if (!team || !requesterName || !doctorName || !value || !crm || !category || !actionType) {
+        const { team, requesterName, actionDate, doctorName, value, crm, category, actionType } = editingEntry;
+        if (!team || !requesterName || !actionDate || !doctorName || !value || !crm || !category || !actionType) {
             return notify("Preencha todos os campos obrigatórios.", "error");
         }
         try {
             await updateDoc(doc(db, COLLECTION_NAME, editingEntry.id), {
-                team, requesterName, doctorName, value, crm, category, actionType, observations: editingEntry.observations || ''
+                team, requesterName, actionDate, doctorName, value, crm, category, actionType, observations: editingEntry.observations || ''
             });
             setEditingEntry(null);
             if (navigator.vibrate) navigator.vibrate([30, 50, 30]); 
@@ -669,7 +662,6 @@ export default function App() {
     return (
         <div className="min-h-screen bg-slate-100 pb-24 text-slate-900 font-sans">
             
-            {/* POP-UP DE SUCESSO */}
             {showSuccessPopup && (
                 <div className="fixed inset-0 z-[110] flex items-center justify-center p-6 animate-in fade-in duration-300">
                     <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-sm" onClick={() => setShowSuccessPopup(false)}></div>
@@ -688,7 +680,6 @@ export default function App() {
                 </div>
             )}
 
-            {/* MODAL DE EXCLUSÃO */}
             {deleteTarget && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 animate-in fade-in duration-200">
                     <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setDeleteTarget(null)}></div>
@@ -704,7 +695,6 @@ export default function App() {
                 </div>
             )}
 
-            {/* MODAL DE EDIÇÃO COMPLETA (AO ARRASTAR PARA A DIREITA) */}
             {editingEntry && (
                 <div className="fixed inset-0 z-[105] flex items-end justify-center bg-slate-900/80 backdrop-blur-sm" onClick={() => setEditingEntry(null)}>
                     <div 
@@ -729,6 +719,17 @@ export default function App() {
                                 ) : (
                                     <input value={editingEntry.requesterName} onChange={handleEditChange} name="requesterName" placeholder="NOME COMPLETO" disabled={!editingEntry.team} className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl font-bold text-sm outline-none uppercase focus:border-emerald-500" />
                                 )}
+                            </div>
+
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-bold text-slate-500 ml-1 uppercase tracking-widest italic">Data da Ação</label>
+                                <input 
+                                    type="date" 
+                                    name="actionDate" 
+                                    value={editingEntry.actionDate || ''} 
+                                    onChange={handleEditChange} 
+                                    className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl font-bold text-sm outline-none focus:border-emerald-500 transition-all uppercase text-slate-600" 
+                                />
                             </div>
 
                             <input name="doctorName" value={editingEntry.doctorName} onChange={handleEditChange} placeholder="NOME DO MÉDICO / DESTINATÁRIO" className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl font-bold text-sm outline-none focus:border-emerald-500 transition-all uppercase placeholder:text-slate-400" />
@@ -776,7 +777,6 @@ export default function App() {
             )}
 
             <main className="max-w-md mx-auto p-4">
-                {/* ======================= ABA NOVO ======================= */}
                 {view === 'form' && (
                     <div className="bg-white rounded-[2rem] p-7 shadow-2xl border border-slate-100 animate-in fade-in zoom-in-95">
                         <h2 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] mb-7 flex items-center gap-2">
@@ -802,6 +802,17 @@ export default function App() {
                                         className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl font-bold text-sm outline-none uppercase transition-all focus:border-emerald-500" 
                                     />
                                 )}
+                            </div>
+
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-bold text-slate-500 ml-1 uppercase tracking-widest italic">Data da Ação</label>
+                                <input 
+                                    type="date" 
+                                    name="actionDate" 
+                                    value={formData.actionDate} 
+                                    onChange={handleInputChange} 
+                                    className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl font-bold text-sm outline-none focus:border-emerald-500 transition-all uppercase text-slate-600" 
+                                />
                             </div>
 
                             <input value={formData.doctorName} onChange={e => setFormData({...formData, doctorName: e.target.value})} placeholder="NOME DO MÉDICO / DESTINATÁRIO" className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl font-bold text-sm outline-none focus:border-emerald-500 transition-all uppercase placeholder:text-slate-400" />
@@ -831,7 +842,6 @@ export default function App() {
                     </div>
                 )}
 
-                {/* ======================= ABA FEED ======================= */}
                 {view === 'history' && (
                     <div className="space-y-5 animate-in slide-in-from-bottom-4 duration-500 pb-10">
                         
@@ -950,31 +960,45 @@ export default function App() {
                                 </p>
                             </div>
                         ) : (
-                            feedEntries.map(e => (
-                                <div key={e.id} className="bg-white p-5 rounded-2xl shadow-md border border-slate-100 flex justify-between items-start active:scale-[0.98] transition-all">
-                                    <div className="min-w-0 pr-4 text-left">
-                                        <span className="text-[9px] font-black text-emerald-600 uppercase bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-100">{String(e.team || 'S/ Equipe')}</span>
-                                        <h3 className="font-bold text-slate-800 text-sm truncate mt-2 uppercase leading-tight">{String(e.doctorName || '')}</h3>
-                                        <p className="text-[11px] text-slate-500 font-bold uppercase truncate opacity-70 mt-0.5">{String(e.requesterName || '')} • {String(e.actionType || '')}</p>
-                                    </div>
-                                    <div className="text-right shrink-0 flex flex-col items-end">
-                                        <p className="font-black text-slate-900 text-sm uppercase tracking-tighter">R$ {String(e.value || '0,00')}</p>
-                                        <p className="text-[10px] text-slate-400 font-bold mt-1">{formatDate(e.createdAt)}</p>
-                                        
-                                        {/* Botão de excluir tradicional se necessário */}
+                            feedEntries.map(e => {
+                                const formattedActionDate = e.actionDate ? new Date(e.actionDate + 'T12:00:00').toLocaleDateString('pt-BR') : '';
+                                return (
+                                    <div key={e.id} className="bg-white p-5 rounded-2xl shadow-md border border-slate-100 flex flex-col active:scale-[0.98] transition-all">
+                                        <div className="flex justify-between items-start">
+                                            <div className="min-w-0 pr-4 text-left">
+                                                <div className="flex items-center gap-2 mb-2">
+                                                    <span className="text-[9px] font-black text-emerald-600 uppercase bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-100">{String(e.team || 'S/ Equipe')}</span>
+                                                    {formattedActionDate && (
+                                                        <span className="text-[9px] font-bold text-slate-500 uppercase bg-slate-100 px-2.5 py-1 rounded-full border border-slate-200">📅 {formattedActionDate}</span>
+                                                    )}
+                                                </div>
+                                                <h3 className="font-bold text-slate-800 text-sm truncate uppercase leading-tight">{String(e.doctorName || '')}</h3>
+                                                <p className="text-[11px] text-slate-500 font-bold uppercase truncate opacity-70 mt-0.5">{String(e.requesterName || '')} • {String(e.actionType || '')}</p>
+                                            </div>
+                                            <div className="text-right shrink-0 flex flex-col items-end">
+                                                <p className="font-black text-slate-900 text-sm uppercase tracking-tighter">R$ {String(e.value || '0,00')}</p>
+                                                <p className="text-[10px] text-slate-400 font-bold mt-1">{formatDate(e.createdAt)}</p>
+                                            </div>
+                                        </div>
+
+                                        {/* NOVO: Botões Editar e Excluir para o Representante no Feed */}
                                         {!currentAdmin && e.userId === user?.uid && (
-                                            <button onClick={() => setDeleteTarget(e)} className="mt-3 bg-rose-50 text-rose-600 font-bold py-1 px-2 rounded text-[10px] uppercase active:scale-90 transition-all border border-rose-100">
-                                                Excluir
-                                            </button>
+                                            <div className="flex justify-end gap-2 mt-4 pt-3 border-t border-slate-50">
+                                                <button onClick={() => setEditingEntry(e)} className="bg-sky-50 text-sky-600 font-bold py-1.5 px-3 rounded-lg text-[10px] uppercase active:scale-90 transition-all border border-sky-100">
+                                                    Editar
+                                                </button>
+                                                <button onClick={() => setDeleteTarget(e)} className="bg-rose-50 text-rose-600 font-bold py-1.5 px-3 rounded-lg text-[10px] uppercase active:scale-90 transition-all border border-rose-100">
+                                                    Excluir
+                                                </button>
+                                            </div>
                                         )}
                                     </div>
-                                </div>
-                            ))
+                                );
+                            })
                         )}
                     </div>
                 )}
 
-                {/* ======================= ABA GESTOR (COM O NOVO DESLIZAR) ======================= */}
                 {view === 'admin' && (
                     <div className="animate-in fade-in duration-500">
                         {!currentAdmin ? (
@@ -1017,7 +1041,6 @@ export default function App() {
                                             <div className="bg-white p-6 rounded-[2rem] shadow-lg border border-slate-200 text-center uppercase"><p className="text-[10px] font-black text-slate-400 mb-2 tracking-widest leading-none">Total Lançamentos</p><h4 className="text-3xl font-black text-slate-800 leading-none">{countEntriesAdmin}</h4></div>
                                         </div>
 
-                                        {/* RANKING: TOTAL POR DISTRITAL (EXCLUSIVO ADMIN GERAL) */}
                                         {currentAdmin.isGeneral && (
                                             <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100">
                                                 <h3 className="text-[10px] font-black text-slate-800 uppercase tracking-[0.2em] mb-6 flex items-center gap-2">Total por Distrital</h3>
@@ -1050,7 +1073,6 @@ export default function App() {
                                             </div>
                                         </div>
                                         
-                                        {/* AQUI ENTRA A LISTA COM OS NOVOS CARTÕES DESLIZANTES */}
                                         {filteredEntriesAdmin.map(e => (
                                             <SwipeableEntry 
                                                 key={e.id} 
