@@ -1,4 +1,4 @@
-```react
+react
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, onAuthStateChanged, signInAnonymously } from 'firebase/auth';
@@ -1258,5 +1258,3 @@ export default function App() {
     );
 }
 
-
-```
