@@ -110,9 +110,7 @@ const ADMIN_USERS = {
 // MÁSCARA AUTOMÁTICA DE CRM (Sem hífen, Limite de 9 dígitos)
 // =========================================================================
 const formatCRM = (val) => {
-    // Remove tudo o que não for letra ou número e passa a maiúsculas
     let v = String(val || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
-    // Limita a 9 caracteres no total (Ex: SP1234567)
     return v.substring(0, 9);
 };
 
@@ -316,9 +314,12 @@ export default function App() {
     // NOVO STATE: Guarda o banco de dados dos médicos
     const [doctorsDatabase, setDoctorsDatabase] = useState({});
 
-    // CARREGA A LISTA DE MÉDICOS DO GITHUB
+    // CARREGA A LISTA DE MÉDICOS DO GITHUB (COM QUEBRADOR DE CACHE)
     useEffect(() => {
-        fetch('/medicos.json')
+        // O ?v= timestamp obriga o navegador a baixar sempre a versão nova e ignorar a memória antiga
+        const url = './medicos.json?v=' + new Date().getTime();
+        
+        fetch(url, { cache: 'no-store' })
             .then(response => {
                 if (!response.ok) throw new Error("Ficheiro medicos.json não encontrado");
                 return response.json();
@@ -327,23 +328,24 @@ export default function App() {
                 const dbDict = {};
                 data.forEach(med => {
                     if (med.crm) {
-                        const cleanCRM = formatCRM(med.crm); // Limpa e padroniza para o formato sem traço
+                        const cleanCRM = formatCRM(med.crm);
                         
-                        // Adapta a Categoria (Se for só o número "1", vira "CAT 1")
                         let catFormatada = String(med.categoria || '').trim();
                         if (/^\d+$/.test(catFormatada)) {
                             catFormatada = `CAT ${catFormatada}`;
                         }
 
-                        // Aceita a coluna chamada "medico" ou "nome"
                         const nomeMedico = med.medico || med.nome || '';
                         
                         dbDict[cleanCRM] = { name: nomeMedico, category: catFormatada };
                     }
                 });
                 setDoctorsDatabase(dbDict);
+                console.log(`Sucesso: ${Object.keys(dbDict).length} médicos carregados!`);
             })
-            .catch(err => console.log("Aviso: Banco de médicos offline não detectado.", err));
+            .catch(err => {
+                console.error("Aviso: Banco de médicos offline não detectado ou erro na leitura.", err);
+            });
     }, []);
 
     useEffect(() => {
@@ -758,6 +760,8 @@ export default function App() {
         return formData.team ? `Seu Total (${formData.team})` : "Seu Total Utilizado";
     };
 
+    const numMedicosCarregados = Object.keys(doctorsDatabase).length;
+
     return (
         <div className="min-h-screen bg-slate-100 pb-24 text-slate-900 font-sans">
             
@@ -833,7 +837,9 @@ export default function App() {
 
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-1.5">
-                                    <label className="text-[10px] font-bold text-slate-500 ml-1 uppercase tracking-widest italic">CRM (Busca Auto)</label>
+                                    <label className="text-[10px] font-bold text-slate-500 ml-1 uppercase tracking-widest italic">
+                                        CRM {numMedicosCarregados > 0 ? `(AUTO: ${numMedicosCarregados} MÉDICOS)` : '(AUTO)'}
+                                    </label>
                                     <input name="crm" value={editingEntry.crm} onChange={handleEditChange} placeholder="UF0000000" maxLength={9} className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl font-bold text-sm outline-none uppercase focus:border-emerald-500 transition-all placeholder:text-slate-400" />
                                 </div>
                                 <div className="space-y-1.5">
@@ -922,7 +928,9 @@ export default function App() {
 
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-1.5">
-                                    <label className="text-[10px] font-bold text-slate-500 ml-1 uppercase tracking-widest italic">CRM (Busca Auto)</label>
+                                    <label className="text-[10px] font-bold text-slate-500 ml-1 uppercase tracking-widest italic">
+                                        CRM {numMedicosCarregados > 0 ? `(AUTO: ${numMedicosCarregados} MÉDICOS)` : '(AUTO)'}
+                                    </label>
                                     <input 
                                         name="crm"
                                         value={formData.crm} 
@@ -1252,4 +1260,3 @@ export default function App() {
 
 
 ```
-
