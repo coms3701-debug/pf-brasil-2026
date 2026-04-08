@@ -1,3 +1,4 @@
+```react
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, onAuthStateChanged, signInAnonymously } from 'firebase/auth';
@@ -28,69 +29,20 @@ const TEAMS = [
 ];
 
 const REPRESENTATIVES = {
-    "DISTRITAL RIO TOTAL": [
-        "CARLOS OTAVIO", "LIVIA NUNES DO AMARAL", "VALERIA DIAS DA COSTA", 
-        "THAIS SANTANNA RIBEIRO", "CARLOS EDUARDO DO NASCIMENTO SOARES",
-        "FERNANDA DE JESUS NASCIMENTO", "ARTHUR MARILAC FERREIRA", 
-        "ELIZABETH LIMA DA SILVA", "CARINA CARVALHO DIAS DE AMORIM",
-        "ROSIMERE MARIA DA SILVA FALCAO", "DEBORAH DE ALMEIDA LEITE PINTO DE LACERDA",
-        "ISIS DE OLIVEIRA ALVES", "PATRICIA MEIRE DE SOUZA IAMIM SILVA"
-    ],
-    "DISTRITAL MG/ES": [
-        "CALEBE MIRANDA WANDERLEY", "HELOISA DE BARROS", "MARSEILLE COSTA DE CARVALHO", 
-        "AMANDA DE OLIVEIRA MOURA", "IZABELA SALES ROCHA DELUCCA", 
-        "PAULO MARCIO TOFANI DE MELLO JUNIOR", "KENIA OLIVEIRA CANHESTRO",
-        "KELLY CRISTINA PEREIRA DE ARAUJO"
-    ],
-    "DISTRITAL NNE": [
-        "SUELLEN VASCONCELOS", "LEILA MARIA BRIZENO ALVES SETUBAL", 
-        "JOSE BERNARDO SOUZA SILVA OLIVEIRA", "ANA ROSA FERREIRA DE MELO VENTURA",
-        "RICARDO JOSE COELHO DE ALBUQUERQUE", "MARCIA CATERINE MELO LIMA DA ROCHA",
-        "FABIANA CRISTINA PINTO TETI MAGALHAES DE MORAES", 
-        "FLAVIA MARIA CAVALCANTI MADUREIRA", "KALIANNE FELIX", "LUIS PINHEIRO"
-    ],
-    "DISTRITAL SPC1": [
-        "SIDNEI DE SANTIS", "GABRIELA ARAUJO DE PIERI ZAMPIERI", "PAULA NERY ARAGAO", "VALDIRENE COSME DA CONCEICAO DE FLOR",
-        "KARINA PEREIRA SILVA ACTIS", "RAFAEL MENDES PEREIRA", "MONIQUE CAROLINA MARQUES GONÇALVES",
-        "ROBERTA SALES GADELHA", "SHEILA SANTANA FULNAZARI", "GRAZIELA VICENTE TORRECILLAS",
-        "PAMELA ARAUJO DA COSTA"
-    ],
-    "DISTRITAL SPC2": [
-        "VAGO", "SILVIA REGINA LAZINHO", "GISELE MAKUL BIANCO", 
-        "MARCEL OLMO FERNANDES BRANCO", "LUCIENE DE SOUZA", "GISLAINE MONTINI BIZINOTTI",
-        "KARINA CAVALCANTI", "AMANDA CARDOSO SANTANA", "VAGO VM", "FLAVIA LUIZA CARDOSO LIUTTI",
-        "GABRIELA ARAUJO DE PIERI ZAMPIERI", "NIVALDO SABINO", "VANESSA GARCIA DE OLIVEIRA",
-        "SEBASTIAO ARAUJO ALMEIDA"
-    ],
-    "DISTRITAL SPI/BSB": [
-        "CARLOS DIAS", "LUCIANA ARAUJO DE OLIVEIRA CAMPOS", "LARISSA ALMEIDA FERNANDES",
-        "MARIANA LOBO MOREIRA", "LUCILIA CIBELE DE OLIVEIRA", "GELIANE DE LIMA",
-        "KARINA APARECIDA PADILHA MOTA", "CRISTIANO CARVALHO DO NASCIMENTO",
-        "DOUGLAS RODRIGO MUNHOZ DOMINGOS FIOCHI", "ELIS CRISTINA FURQUIM SILVA",
-        "BRUNO CAETANO FELIX", "CLAYLTON DE SOUZA", "KELLY FABIANE DA SILVA"
-    ],
-    "DISTRITAL SPI/GNY": [
-        "JACQUELINE MENEZES", "LINDA LUCIA DE SOUSA ALVES OLIVEIRA", 
-        "LADY MARY DE SOUZA ALMEIDA LINHARES", "PAOLA FERNANDA DA SILVA MOSCOSO DE BARROS", 
-        "VERA ALICE BEVEVINO DIAS DE MORAES RIGHETI", 
-        "GIOVANA SALAB DEPOLLI", "ARYADINE CARDOSO DE SOUZA", 
-        "ANTONIO MARCOS SHIMAZAKI DA SILVA", 
-        "JANAINA BEMMUYAL PARENTE SANTOS", "SANDRINE AGNES LUCIE YOUST"    
-    ],
-    "DISTRITAL SUL": [
-        "MARIANE GONCALVES", "LIEDER VARELA DIAS", "IZADORA GIMENES QUEVEDO",
-        "TATIANA RODRIGUES DA FONSECA", "MEIRE TEREZINHA LEMES FERNANDES", "LAURO FERREIRA JUNIOR",
-        "JULIANA STEFANIE OLIVEIRA", "THIAGO TOMAZZONI FERRARI", "TATIANE FERRARI", "DANNY MELO PEREIRA"
-    ],
+    "DISTRITAL RIO TOTAL": ["CARLOS OTAVIO", "LIVIA NUNES DO AMARAL", "VALERIA DIAS DA COSTA", "THAIS SANTANNA RIBEIRO", "CARLOS EDUARDO DO NASCIMENTO SOARES", "FERNANDA DE JESUS NASCIMENTO", "ARTHUR MARILAC FERREIRA", "ELIZABETH LIMA DA SILVA", "CARINA CARVALHO DIAS DE AMORIM", "ROSIMERE MARIA DA SILVA FALCAO", "DEBORAH DE ALMEIDA LEITE PINTO DE LACERDA", "ISIS DE OLIVEIRA ALVES", "PATRICIA MEIRE DE SOUZA IAMIM SILVA"],
+    "DISTRITAL MG/ES": ["CALEBE MIRANDA WANDERLEY", "HELOISA DE BARROS", "MARSEILLE COSTA DE CARVALHO", "AMANDA DE OLIVEIRA MOURA", "IZABELA SALES ROCHA DELUCCA", "PAULO MARCIO TOFANI DE MELLO JUNIOR", "KENIA OLIVEIRA CANHESTRO", "KELLY CRISTINA PEREIRA DE ARAUJO"],
+    "DISTRITAL NNE": ["SUELLEN VASCONCELOS", "LEILA MARIA BRIZENO ALVES SETUBAL", "JOSE BERNARDO SOUZA SILVA OLIVEIRA", "ANA ROSA FERREIRA DE MELO VENTURA", "RICARDO JOSE COELHO DE ALBUQUERQUE", "MARCIA CATERINE MELO LIMA DA ROCHA", "FABIANA CRISTINA PINTO TETI MAGALHAES DE MORAES", "FLAVIA MARIA CAVALCANTI MADUREIRA", "KALIANNE FELIX", "LUIS PINHEIRO"],
+    "DISTRITAL SPC1": ["SIDNEI DE SANTIS", "GABRIELA ARAUJO DE PIERI ZAMPIERI", "PAULA NERY ARAGAO", "VALDIRENE COSME DA CONCEICAO DE FLOR", "KARINA PEREIRA SILVA ACTIS", "RAFAEL MENDES PEREIRA", "MONIQUE CAROLINA MARQUES GONÇALVES", "ROBERTA SALES GADELHA", "SHEILA SANTANA FULNAZARI", "GRAZIELA VICENTE TORRECILLAS", "PAMELA ARAUJO DA COSTA"],
+    "DISTRITAL SPC2": ["VAGO", "SILVIA REGINA LAZINHO", "GISELE MAKUL BIANCO", "MARCEL OLMO FERNANDES BRANCO", "LUCIENE DE SOUZA", "GISLAINE MONTINI BIZINOTTI", "KARINA CAVALCANTI", "AMANDA CARDOSO SANTANA", "VAGO VM", "FLAVIA LUIZA CARDOSO LIUTTI", "GABRIELA ARAUJO DE PIERI ZAMPIERI", "NIVALDO SABINO", "VANESSA GARCIA DE OLIVEIRA", "SEBASTIAO ARAUJO ALMEIDA"],
+    "DISTRITAL SPI/BSB": ["CARLOS DIAS", "LUCIANA ARAUJO DE OLIVEIRA CAMPOS", "LARISSA ALMEIDA FERNANDES", "MARIANA LOBO MOREIRA", "LUCILIA CIBELE DE OLIVEIRA", "GELIANE DE LIMA", "KARINA APARECIDA PADILHA MOTA", "CRISTIANO CARVALHO DO NASCIMENTO", "DOUGLAS RODRIGO MUNHOZ DOMINGOS FIOCHI", "ELIS CRISTINA FURQUIM SILVA", "BRUNO CAETANO FELIX", "CLAYLTON DE SOUZA", "KELLY FABIANE DA SILVA"],
+    "DISTRITAL SPI/GNY": ["JACQUELINE MENEZES", "LINDA LUCIA DE SOUSA ALVES OLIVEIRA", "LADY MARY DE SOUZA ALMEIDA LINHARES", "PAOLA FERNANDA DA SILVA MOSCOSO DE BARROS", "VERA ALICE BEVEVINO DIAS DE MORAES RIGHETI", "GIOVANA SALAB DEPOLLI", "ARYADINE CARDOSO DE SOUZA", "ANTONIO MARCOS SHIMAZAKI DA SILVA", "JANAINA BEMMUYAL PARENTE SANTOS", "SANDRINE AGNES LUCIE YOUST"],
+    "DISTRITAL SUL": ["MARIANE GONCALVES", "LIEDER VARELA DIAS", "IZADORA GIMENES QUEVEDO", "TATIANA RODRIGUES DA FONSECA", "MEIRE TEREZINHA LEMES FERNANDES", "LAURO FERREIRA JUNIOR", "JULIANA STEFANIE OLIVEIRA", "THIAGO TOMAZZONI FERRARI", "TATIANE FERRARI", "DANNY MELO PEREIRA"],
     "GERENTE NACIONAL DE VISITAÇÃO MÉDICA": ["BRUNO JORGE"],
     "GERENTE NACIONAL DE EXECUÇÃO": ["GUSTAVO LIMA"],
     "DIRETORIA (MATRIZ)": ["CARLOS OTAVIO"]
 };
 
-const ACTION_TYPES = [
-    'DIAS DE PRODUTO', 'PRESENTE', 'REFEIÇÃO', 'CONGRESSOS', 
-    'ORGANIZAÇÃO DE AMOSTRAS', 'MINI MEETING', 'EVENTOS', 'COMPRA DE ORIGINAIS', 'MATERIAL GRÁFICO'
-];
+const ACTION_TYPES = ['DIAS DE PRODUTO', 'PRESENTE', 'REFEIÇÃO', 'CONGRESSOS', 'ORGANIZAÇÃO DE AMOSTRAS', 'MINI MEETING', 'EVENTOS', 'COMPRA DE ORIGINAIS', 'MATERIAL GRÁFICO'];
 const CATEGORIES = ['CAT 1', 'CAT 2', 'CAT 3', 'CAT 4', 'CAT5', 'OUTROS'];
 
 const ADMIN_USERS = {
@@ -105,9 +57,13 @@ const ADMIN_USERS = {
     "1008": { name: "GESTOR SUL", isGeneral: false, team: "DISTRITAL SUL" }
 };
 
-// =========================================================================
+// MÁSCARA AUTOMÁTICA DE CRM (Sem hífen, Limite de 9 dígitos)
+const formatCRM = (val) => {
+    let v = String(val || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    return v.substring(0, 9);
+};
+
 // COMPONENTE: TOUCH SELECT
-// =========================================================================
 const TouchSelect = ({ name, value, onChange, options, placeholder }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [highlight, setHighlight] = useState(-1);
@@ -137,7 +93,7 @@ const TouchSelect = ({ name, value, onChange, options, placeholder }) => {
                 if (idx !== highlightRef.current) {
                     setHighlight(idx);
                     highlightRef.current = idx;
-                    try { if (navigator.vibrate) navigator.vibrate(15); } catch(e){}
+                    try { if (navigator.vibrate) navigator.vibrate(15); } catch(err){}
                 }
             } else {
                 setHighlight(-1);
@@ -152,7 +108,7 @@ const TouchSelect = ({ name, value, onChange, options, placeholder }) => {
     const handleEnd = () => {
         if (highlightRef.current >= 0 && options[highlightRef.current]) {
             onChange({ target: { name, value: options[highlightRef.current] } });
-            try { if (navigator.vibrate) navigator.vibrate([30, 50, 30]); } catch(e){}
+            try { if (navigator.vibrate) navigator.vibrate([30, 50, 30]); } catch(err){}
         }
         setIsOpen(false);
         setHighlight(-1);
@@ -175,12 +131,7 @@ const TouchSelect = ({ name, value, onChange, options, placeholder }) => {
                         <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-4 shrink-0"></div>
                         <p className="text-[10px] font-black text-slate-400 mb-3 uppercase text-center tracking-widest shrink-0">Deslize o dedo sem soltar</p>
                         
-                        <div 
-                            ref={containerRef}
-                            className="space-y-1 relative"
-                            onTouchEnd={handleEnd}
-                            onTouchCancel={handleEnd}
-                        >
+                        <div ref={containerRef} className="space-y-1 relative" onTouchEnd={handleEnd} onTouchCancel={handleEnd}>
                             {options.map((opt, i) => (
                                 <div 
                                     key={opt} 
@@ -188,7 +139,7 @@ const TouchSelect = ({ name, value, onChange, options, placeholder }) => {
                                     onTouchStart={() => { 
                                         setHighlight(i); 
                                         highlightRef.current = i;
-                                        try{ if (navigator.vibrate) navigator.vibrate(15); }catch(e){} 
+                                        try{ if (navigator.vibrate) navigator.vibrate(15); }catch(err){} 
                                     }}
                                     onClick={() => { onChange({ target: { name, value: opt }}); setIsOpen(false); }}
                                     className={`p-3 rounded-xl transition-all duration-75 cursor-pointer border flex items-center ${value === opt || highlight === i ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/40 scale-[1.02] border-emerald-400 z-10 relative' : 'bg-slate-50 text-slate-700 border-slate-100 hover:bg-slate-100'}`}
@@ -204,9 +155,7 @@ const TouchSelect = ({ name, value, onChange, options, placeholder }) => {
     );
 };
 
-// =========================================================================
-// COMPONENTE: SWIPEABLE ENTRY (ARRASTAR PARA EDITAR/EXCLUIR)
-// =========================================================================
+// COMPONENTE: SWIPEABLE ENTRY
 const SwipeableEntry = ({ entry, onEdit, onDelete, formatDate }) => {
     const [startX, setStartX] = useState(0);
     const [startY, setStartY] = useState(0);
@@ -220,7 +169,6 @@ const SwipeableEntry = ({ entry, onEdit, onDelete, formatDate }) => {
     const handleMove = (e) => {
         const diffX = e.touches[0].clientX - startX;
         const diffY = e.touches[0].clientY - startY;
-        
         if (Math.abs(diffY) > Math.abs(diffX)) return;
         
         if (diffX > 120) setOffsetX(120);
@@ -231,11 +179,11 @@ const SwipeableEntry = ({ entry, onEdit, onDelete, formatDate }) => {
     const handleEnd = () => {
         if (offsetX > 70) {
             onEdit(entry); 
-            if (navigator.vibrate) navigator.vibrate(20);
+            try { if (navigator.vibrate) navigator.vibrate(20); } catch(e){}
         }
         else if (offsetX < -70) {
             onDelete(entry); 
-            if (navigator.vibrate) navigator.vibrate(20);
+            try { if (navigator.vibrate) navigator.vibrate(20); } catch(e){}
         }
         setOffsetX(0); 
     };
@@ -292,7 +240,7 @@ export default function App() {
     const [status, setStatus] = useState({ type: '', msg: '' });
     const [showSuccessPopup, setShowSuccessPopup] = useState(false);
     
-    // GESTOR STATES (ATUALIZADOS COM FILTRO DUPLO)
+    // GESTOR STATES
     const [currentAdmin, setCurrentAdmin] = useState(null);
     const [pinInput, setPinInput] = useState('');
     const [adminTab, setAdminTab] = useState('reports'); 
@@ -301,6 +249,38 @@ export default function App() {
     
     const [deleteTarget, setDeleteTarget] = useState(null);
     const [editingEntry, setEditingEntry] = useState(null); 
+
+    // NOVO: STATE PARA O BANCO DE MÉDICOS
+    const [doctorsDatabase, setDoctorsDatabase] = useState({});
+
+    // EFEITO PARA CARREGAR OS MÉDICOS (Com blindagem de erros)
+    useEffect(() => {
+        // Tenta buscar o arquivo. Se falhar, avisa, mas não quebra o site!
+        fetch('/medicos.json?v=' + new Date().getTime(), { cache: 'no-store' })
+            .then(res => {
+                if (!res.ok) throw new Error("Ficheiro não encontrado");
+                return res.json();
+            })
+            .then(data => {
+                const dbDict = {};
+                data.forEach(m => {
+                    if (m.crm) {
+                        const cleanCRM = formatCRM(m.crm);
+                        let catFormatada = String(m.categoria || '').trim();
+                        // Transforma "1" em "CAT 1"
+                        if (/^\d+$/.test(catFormatada)) catFormatada = `CAT ${catFormatada}`;
+                        
+                        const nomeMedico = m.medico || m.nome || '';
+                        dbDict[cleanCRM] = { name: nomeMedico, category: catFormatada };
+                    }
+                });
+                setDoctorsDatabase(dbDict);
+                console.log(`Sucesso: ${Object.keys(dbDict).length} médicos carregados!`);
+            })
+            .catch(err => {
+                console.log("INFO: Modo Manual Ativado. Ficheiro de médicos offline.", err);
+            });
+    }, []);
 
     useEffect(() => {
         try {
@@ -413,9 +393,6 @@ export default function App() {
         } catch (e) { return ''; }
     };
 
-    // =========================================================================
-    // LÓGICA DE FILTRAGEM DUPLA (GESTOR)
-    // =========================================================================
     const effectiveAdminTeam = useMemo(() => {
         if (!currentAdmin) return null;
         if (currentAdmin.isGeneral) {
@@ -436,7 +413,6 @@ export default function App() {
             if (!currentAdmin) return [];
             let base = entries;
 
-            // 1. Filtro de Distrital
             if (currentAdmin.isGeneral) {
                 if (adminGeneralFilter === 'MINHA EQUIPE') {
                     base = base.filter(e => e.team === currentAdmin.team);
@@ -447,7 +423,6 @@ export default function App() {
                 base = base.filter(e => e.team === currentAdmin.team);
             }
 
-            // 2. Filtro de Representante
             if (adminRepFilter && adminRepFilter !== 'TODOS') {
                 base = base.filter(e => e.requesterName === adminRepFilter);
             }
@@ -595,12 +570,24 @@ export default function App() {
         } catch(e) { return []; }
     }, [filteredEntriesAdmin, parseCurrency]);
 
+    // PREENCHIMENTO AUTOMÁTICO DO MÉDICO E DA CATEGORIA
     const handleInputChange = (e) => {
         const { name, value } = e.target;
         if (name === 'team') {
             setFormData(prev => ({ ...prev, team: value, requesterName: '' }));
         } else if (name === 'value') {
             setFormData(prev => ({ ...prev, [name]: formatValueInput(value) }));
+        } else if (name === 'crm') {
+            const formattedCrm = formatCRM(value);
+            setFormData(prev => {
+                const newState = { ...prev, crm: formattedCrm };
+                if (doctorsDatabase[formattedCrm]) {
+                    newState.doctorName = doctorsDatabase[formattedCrm].name;
+                    newState.category = doctorsDatabase[formattedCrm].category;
+                    try { if (navigator.vibrate) navigator.vibrate([15, 30]); } catch(err){}
+                }
+                return newState;
+            });
         } else {
             setFormData(prev => ({ ...prev, [name]: value }));
         }
@@ -612,6 +599,16 @@ export default function App() {
             setEditingEntry(prev => ({ ...prev, team: value, requesterName: '' }));
         } else if (name === 'value') {
             setEditingEntry(prev => ({ ...prev, [name]: formatValueInput(value) }));
+        } else if (name === 'crm') {
+            const formattedCrm = formatCRM(value);
+            setEditingEntry(prev => {
+                const newState = { ...prev, crm: formattedCrm };
+                if (doctorsDatabase[formattedCrm]) {
+                    newState.doctorName = doctorsDatabase[formattedCrm].name;
+                    newState.category = doctorsDatabase[formattedCrm].category;
+                }
+                return newState;
+            });
         } else {
             setEditingEntry(prev => ({ ...prev, [name]: value }));
         }
@@ -698,6 +695,8 @@ export default function App() {
         return formData.team ? `Seu Total (${formData.team})` : "Seu Total Utilizado";
     };
 
+    const numMedicosCarregados = Object.keys(doctorsDatabase).length;
+
     return (
         <div className="min-h-screen bg-slate-100 pb-24 text-slate-900 font-sans">
             
@@ -771,12 +770,20 @@ export default function App() {
                                 />
                             </div>
 
-                            <input name="doctorName" value={editingEntry.doctorName} onChange={handleEditChange} placeholder="NOME DO MÉDICO / DESTINATÁRIO" className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl font-bold text-sm outline-none focus:border-emerald-500 transition-all uppercase placeholder:text-slate-400" />
-                            
                             <div className="grid grid-cols-2 gap-4">
-                                <input name="crm" value={editingEntry.crm} onChange={handleEditChange} placeholder="UF-CRM" maxLength={9} className="p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl font-bold text-sm outline-none uppercase focus:border-emerald-500 transition-all placeholder:text-slate-400" />
-                                <input name="value" value={editingEntry.value} onChange={handleEditChange} placeholder="R$ 0,00" className="p-4 bg-emerald-50 border-2 border-emerald-100 rounded-2xl font-black text-emerald-800 text-sm outline-none focus:border-emerald-500 transition-all text-center placeholder:text-emerald-400" />
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-bold text-slate-500 ml-1 uppercase tracking-widest italic">
+                                        CRM
+                                    </label>
+                                    <input name="crm" value={editingEntry.crm} onChange={handleEditChange} placeholder="UF0000000" maxLength={9} className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl font-bold text-sm outline-none uppercase focus:border-emerald-500 transition-all placeholder:text-slate-400" />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-bold text-slate-500 ml-1 uppercase tracking-widest italic">Valor (R$)</label>
+                                    <input name="value" value={editingEntry.value} onChange={handleEditChange} placeholder="R$ 0,00" className="w-full p-4 bg-emerald-50 border-2 border-emerald-100 rounded-2xl font-black text-emerald-800 text-sm outline-none focus:border-emerald-500 transition-all text-center placeholder:text-emerald-400" />
+                                </div>
                             </div>
+
+                            <input name="doctorName" value={editingEntry.doctorName} onChange={e => setEditingEntry({...editingEntry, doctorName: e.target.value.toUpperCase()})} placeholder="NOME DO MÉDICO / DESTINATÁRIO" className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl font-bold text-sm outline-none focus:border-emerald-500 transition-all uppercase placeholder:text-slate-400" />
 
                             <div className="grid grid-cols-2 gap-4">
                                 <TouchSelect name="category" value={editingEntry.category} onChange={handleEditChange} options={CATEGORIES} placeholder="CATEGORIA" />
@@ -800,7 +807,9 @@ export default function App() {
                         <div className="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center font-black italic shadow-lg text-white">PF</div>
                         <div>
                             <h1 className="text-base font-black tracking-tight uppercase leading-none">Pierre Fabre</h1>
-                            <p className="text-[10px] text-emerald-400 font-bold tracking-[0.3em] uppercase mt-1">Corporate Brasil</p>
+                            <p className="text-[10px] text-emerald-400 font-bold tracking-[0.3em] uppercase mt-1">
+                                Corporate Brasil {numMedicosCarregados > 0 ? `• 🟢 ${numMedicosCarregados} MD` : '• 🔴 DB OFF'}
+                            </p>
                         </div>
                     </div>
                     <button onClick={exportToCSV} className="bg-slate-800 text-emerald-400 font-bold py-2 px-3 rounded-lg text-xs uppercase tracking-wider active:scale-90 transition-all border border-slate-700">
@@ -854,25 +863,34 @@ export default function App() {
                                 />
                             </div>
 
-                            <input value={formData.doctorName} onChange={e => setFormData({...formData, doctorName: e.target.value})} placeholder="NOME DO MÉDICO / DESTINATÁRIO" className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl font-bold text-sm outline-none focus:border-emerald-500 transition-all uppercase placeholder:text-slate-400" />
-                            
                             <div className="grid grid-cols-2 gap-4">
-                                <input 
-                                    value={formData.crm} 
-                                    onChange={e => setFormData({...formData, crm: e.target.value})} 
-                                    placeholder="UF-CRM" 
-                                    maxLength={9}
-                                    className="p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl font-bold text-sm outline-none uppercase focus:border-emerald-500 transition-all placeholder:text-slate-400" 
-                                />
-                                <input value={formData.value} onChange={e => setFormData({...formData, value: formatValueInput(e.target.value)})} placeholder="R$ 0,00" className="p-4 bg-emerald-50 border-2 border-emerald-100 rounded-2xl font-black text-emerald-800 text-sm outline-none focus:border-emerald-500 transition-all text-center placeholder:text-emerald-400" />
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-bold text-slate-500 ml-1 uppercase tracking-widest italic">
+                                        CRM
+                                    </label>
+                                    <input 
+                                        name="crm"
+                                        value={formData.crm} 
+                                        onChange={handleInputChange} 
+                                        placeholder="UF0000000" 
+                                        maxLength={9}
+                                        className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl font-bold text-sm outline-none uppercase focus:border-emerald-500 transition-all placeholder:text-slate-400" 
+                                    />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-bold text-slate-500 ml-1 uppercase tracking-widest italic">Valor (R$)</label>
+                                    <input name="value" value={formData.value} onChange={handleInputChange} placeholder="R$ 0,00" className="w-full p-4 bg-emerald-50 border-2 border-emerald-100 rounded-2xl font-black text-emerald-800 text-sm outline-none focus:border-emerald-500 transition-all text-center placeholder:text-emerald-400" />
+                                </div>
                             </div>
+
+                            <input name="doctorName" value={formData.doctorName} onChange={e => setFormData({...formData, doctorName: e.target.value.toUpperCase()})} placeholder="NOME DO MÉDICO / DESTINATÁRIO" className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl font-bold text-sm outline-none focus:border-emerald-500 transition-all uppercase placeholder:text-slate-400" />
 
                             <div className="grid grid-cols-2 gap-4">
                                 <TouchSelect name="category" value={formData.category} onChange={handleInputChange} options={CATEGORIES} placeholder="CATEGORIA..." />
                                 <TouchSelect name="actionType" value={formData.actionType} onChange={handleInputChange} options={ACTION_TYPES} placeholder="AÇÃO..." />
                             </div>
 
-                            <textarea value={formData.observations} onChange={e => setFormData({...formData, observations: e.target.value})} placeholder="DETALHE A AÇÃO AQUI..." rows="3" className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl text-sm font-medium outline-none focus:border-emerald-500 transition-all uppercase placeholder:text-slate-400" />
+                            <textarea name="observations" value={formData.observations} onChange={handleInputChange} placeholder="DETALHE A AÇÃO AQUI..." rows="3" className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl text-sm font-medium outline-none focus:border-emerald-500 transition-all uppercase placeholder:text-slate-400" />
                             
                             <button type="submit" className="w-full bg-slate-900 text-white font-black py-5 rounded-2xl shadow-2xl active:scale-[0.96] transition-all flex items-center justify-center gap-2 uppercase text-sm tracking-widest mt-4">
                                 Registrar solicitação
@@ -884,7 +902,6 @@ export default function App() {
                 {view === 'history' && (
                     <div className="space-y-5 animate-in slide-in-from-bottom-4 duration-500 pb-10">
                         
-                        {/* Se o administrador usar a aba histórico, garantimos que o select reflete a nova state */}
                         {currentAdmin && currentAdmin.isGeneral && (
                             <select 
                                 value={adminGeneralFilter} 
@@ -1021,7 +1038,7 @@ export default function App() {
                                             </div>
                                             <div className="text-right shrink-0 flex flex-col items-end">
                                                 <p className="font-black text-slate-900 text-sm uppercase tracking-tighter">R$ {String(e.value || '0,00')}</p>
-                                                <p className="text-[10px] text-slate-400 font-bold mt-1">{formatDate(e.createdAt)}</p>
+                                                <p className="text-[10px] text-slate-400 font-bold mt-1">{formatDate(entry.createdAt)}</p>
                                             </div>
                                         </div>
 
@@ -1064,9 +1081,6 @@ export default function App() {
                                     <button onClick={logoutAdmin} className="text-xs font-black uppercase bg-rose-500/20 text-rose-400 px-4 py-2.5 rounded-xl active:scale-90 shadow-md border border-rose-500/30 transition-all">Sair</button>
                                 </div>
 
-                                {/* ========================================== */}
-                                {/* NOVO: FILTRO DUPLO DE PESQUISA (GESTOR) */}
-                                {/* ========================================== */}
                                 <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100">
                                     <h3 className="text-[11px] font-black text-slate-800 uppercase tracking-widest mb-5 flex items-center gap-2 border-l-2 border-emerald-500 pl-2">
                                         <span className="text-lg">🔍</span> Filtros de Pesquisa
@@ -1081,7 +1095,7 @@ export default function App() {
                                                     value={adminGeneralFilter} 
                                                     onChange={(e) => {
                                                         setAdminGeneralFilter(e.target.value);
-                                                        setAdminRepFilter('TODOS'); // Zera o representante ao trocar de equipe
+                                                        setAdminRepFilter('TODOS'); 
                                                     }} 
                                                     options={['TODAS AS DISTRITAIS', 'MINHA EQUIPE', ...TEAMS]} 
                                                     placeholder="SELECIONAR DISTRITAL" 
@@ -1180,3 +1194,6 @@ export default function App() {
         </div>
     );
 }
+
+
+```
