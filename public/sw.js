@@ -1,4 +1,4 @@
-```javascript
+javascript
 const CACHE_NAME = 'pf-brasil-cache-v2';
 
 self.addEventListener('install', (event) => {
@@ -34,5 +34,3 @@ self.addEventListener('fetch', (event) => {
     );
 });
 
-
-```
