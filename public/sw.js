@@ -1,4 +1,3 @@
-javascript
 const CACHE_NAME = 'pf-v5-final';
 
 self.addEventListener('install', (e) => {
