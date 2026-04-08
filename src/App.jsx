@@ -314,14 +314,13 @@ export default function App() {
     // NOVO STATE: Guarda o banco de dados dos médicos
     const [doctorsDatabase, setDoctorsDatabase] = useState({});
 
-    // CARREGA A LISTA DE MÉDICOS DO GITHUB (COM QUEBRADOR DE CACHE)
+    // CARREGA A LISTA DE MÉDICOS DO GITHUB (COM QUEBRADOR DE CACHE EXTREMO)
     useEffect(() => {
-        // O ?v= timestamp obriga o navegador a baixar sempre a versão nova e ignorar a memória antiga
-        const url = './medicos.json?v=' + new Date().getTime();
+        const url = '/medicos.json?v=' + new Date().getTime();
         
         fetch(url, { cache: 'no-store' })
             .then(response => {
-                if (!response.ok) throw new Error("Ficheiro medicos.json não encontrado");
+                if (!response.ok) throw new Error("Ficheiro não encontrado");
                 return response.json();
             })
             .then(data => {
@@ -336,7 +335,6 @@ export default function App() {
                         }
 
                         const nomeMedico = med.medico || med.nome || '';
-                        
                         dbDict[cleanCRM] = { name: nomeMedico, category: catFormatada };
                     }
                 });
@@ -344,7 +342,7 @@ export default function App() {
                 console.log(`Sucesso: ${Object.keys(dbDict).length} médicos carregados!`);
             })
             .catch(err => {
-                console.error("Aviso: Banco de médicos offline não detectado ou erro na leitura.", err);
+                console.error("Aviso: Falha ao carregar médicos.", err);
             });
     }, []);
 
@@ -760,6 +758,7 @@ export default function App() {
         return formData.team ? `Seu Total (${formData.team})` : "Seu Total Utilizado";
     };
 
+    // Variável para saber quantos médicos foram carregados
     const numMedicosCarregados = Object.keys(doctorsDatabase).length;
 
     return (
@@ -872,7 +871,9 @@ export default function App() {
                         <div className="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center font-black italic shadow-lg text-white">PF</div>
                         <div>
                             <h1 className="text-base font-black tracking-tight uppercase leading-none">Pierre Fabre</h1>
-                            <p className="text-[10px] text-emerald-400 font-bold tracking-[0.3em] uppercase mt-1">Corporate Brasil</p>
+                            <p className="text-[10px] text-emerald-400 font-bold tracking-[0.3em] uppercase mt-1">
+                                Corporate Brasil {numMedicosCarregados > 0 ? `• 🟢 ${numMedicosCarregados} MD` : '• 🔴 DB OFF'}
+                            </p>
                         </div>
                     </div>
                     <button onClick={exportToCSV} className="bg-slate-800 text-emerald-400 font-bold py-2 px-3 rounded-lg text-xs uppercase tracking-wider active:scale-90 transition-all border border-slate-700">
