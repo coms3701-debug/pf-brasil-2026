@@ -168,6 +168,7 @@ const SwipeableEntry = ({ entry, onEdit, onDelete, formatDate }) => {
     const handleMove = (e) => {
         const diffX = e.touches[0].clientX - startX;
         const diffY = e.touches[0].clientY - startY;
+        
         if (Math.abs(diffY) > Math.abs(diffX)) return;
         
         if (diffX > 120) setOffsetX(120);
@@ -249,12 +250,11 @@ export default function App() {
     const [deleteTarget, setDeleteTarget] = useState(null);
     const [editingEntry, setEditingEntry] = useState(null); 
 
-    // NOVO: STATE PARA O BANCO DE MÉDICOS
+    // STATE PARA O BANCO DE MÉDICOS
     const [doctorsDatabase, setDoctorsDatabase] = useState({});
 
     // EFEITO PARA CARREGAR OS MÉDICOS (Com blindagem de erros)
     useEffect(() => {
-        // Tenta buscar o arquivo. Se falhar, avisa, mas não quebra o site!
         fetch('/medicos.json?v=' + new Date().getTime(), { cache: 'no-store' })
             .then(res => {
                 if (!res.ok) throw new Error("Ficheiro não encontrado");
@@ -807,7 +807,7 @@ export default function App() {
                         <div>
                             <h1 className="text-base font-black tracking-tight uppercase leading-none">Pierre Fabre</h1>
                             <p className="text-[10px] text-emerald-400 font-bold tracking-[0.3em] uppercase mt-1">
-                                Corporate Brasil {numMedicosCarregados > 0 ? `• 🟢 ${numMedicosCarregados} MD` : '• 🔴 DB OFF'}
+                                Corporate Brasil {numMedicosCarregados > 0 ? `• 🟢 ${numMedicosCarregados} MD` : ''}
                             </p>
                         </div>
                     </div>
@@ -1037,7 +1037,8 @@ export default function App() {
                                             </div>
                                             <div className="text-right shrink-0 flex flex-col items-end">
                                                 <p className="font-black text-slate-900 text-sm uppercase tracking-tighter">R$ {String(e.value || '0,00')}</p>
-                                                <p className="text-[10px] text-slate-400 font-bold mt-1">{formatDate(entry.createdAt)}</p>
+                                                {/* CORREÇÃO DO ERRO AQUI ABAIXO: 'e.createdAt' em vez de 'entry.createdAt' */}
+                                                <p className="text-[10px] text-slate-400 font-bold mt-1">{formatDate(e.createdAt)}</p>
                                             </div>
                                         </div>
 
@@ -1193,3 +1194,4 @@ export default function App() {
         </div>
     );
 }
+
