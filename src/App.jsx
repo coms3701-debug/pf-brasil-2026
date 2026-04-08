@@ -1,3 +1,4 @@
+```react
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, onAuthStateChanged, signInAnonymously } from 'firebase/auth';
@@ -106,6 +107,16 @@ const ADMIN_USERS = {
 };
 
 // =========================================================================
+// MÁSCARA AUTOMÁTICA DE CRM (Sem hífen, Limite de 9 dígitos)
+// =========================================================================
+const formatCRM = (val) => {
+    // Remove tudo o que não for letra ou número e passa a maiúsculas
+    let v = String(val || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    // Limita a 9 caracteres no total (Ex: SP1234567)
+    return v.substring(0, 9);
+};
+
+// =========================================================================
 // COMPONENTE: TOUCH SELECT
 // =========================================================================
 const TouchSelect = ({ name, value, onChange, options, placeholder }) => {
@@ -205,7 +216,7 @@ const TouchSelect = ({ name, value, onChange, options, placeholder }) => {
 };
 
 // =========================================================================
-// COMPONENTE: SWIPEABLE ENTRY (ARRASTAR PARA EDITAR/EXCLUIR)
+// COMPONENTE: SWIPEABLE ENTRY
 // =========================================================================
 const SwipeableEntry = ({ entry, onEdit, onDelete, formatDate }) => {
     const [startX, setStartX] = useState(0);
@@ -292,7 +303,7 @@ export default function App() {
     const [status, setStatus] = useState({ type: '', msg: '' });
     const [showSuccessPopup, setShowSuccessPopup] = useState(false);
     
-    // GESTOR STATES (ATUALIZADOS COM FILTRO DUPLO)
+    // GESTOR STATES
     const [currentAdmin, setCurrentAdmin] = useState(null);
     const [pinInput, setPinInput] = useState('');
     const [adminTab, setAdminTab] = useState('reports'); 
@@ -301,6 +312,39 @@ export default function App() {
     
     const [deleteTarget, setDeleteTarget] = useState(null);
     const [editingEntry, setEditingEntry] = useState(null); 
+
+    // NOVO STATE: Guarda o banco de dados dos médicos
+    const [doctorsDatabase, setDoctorsDatabase] = useState({});
+
+    // CARREGA A LISTA DE MÉDICOS DO GITHUB
+    useEffect(() => {
+        fetch('/medicos.json')
+            .then(response => {
+                if (!response.ok) throw new Error("Ficheiro medicos.json não encontrado");
+                return response.json();
+            })
+            .then(data => {
+                const dbDict = {};
+                data.forEach(med => {
+                    if (med.crm) {
+                        const cleanCRM = formatCRM(med.crm); // Limpa e padroniza para o formato sem traço
+                        
+                        // Adapta a Categoria (Se for só o número "1", vira "CAT 1")
+                        let catFormatada = String(med.categoria || '').trim();
+                        if (/^\d+$/.test(catFormatada)) {
+                            catFormatada = `CAT ${catFormatada}`;
+                        }
+
+                        // Aceita a coluna chamada "medico" ou "nome"
+                        const nomeMedico = med.medico || med.nome || '';
+                        
+                        dbDict[cleanCRM] = { name: nomeMedico, category: catFormatada };
+                    }
+                });
+                setDoctorsDatabase(dbDict);
+            })
+            .catch(err => console.log("Aviso: Banco de médicos offline não detectado.", err));
+    }, []);
 
     useEffect(() => {
         try {
@@ -413,9 +457,6 @@ export default function App() {
         } catch (e) { return ''; }
     };
 
-    // =========================================================================
-    // LÓGICA DE FILTRAGEM DUPLA (GESTOR)
-    // =========================================================================
     const effectiveAdminTeam = useMemo(() => {
         if (!currentAdmin) return null;
         if (currentAdmin.isGeneral) {
@@ -436,7 +477,6 @@ export default function App() {
             if (!currentAdmin) return [];
             let base = entries;
 
-            // 1. Filtro de Distrital
             if (currentAdmin.isGeneral) {
                 if (adminGeneralFilter === 'MINHA EQUIPE') {
                     base = base.filter(e => e.team === currentAdmin.team);
@@ -447,7 +487,6 @@ export default function App() {
                 base = base.filter(e => e.team === currentAdmin.team);
             }
 
-            // 2. Filtro de Representante
             if (adminRepFilter && adminRepFilter !== 'TODOS') {
                 base = base.filter(e => e.requesterName === adminRepFilter);
             }
@@ -601,6 +640,17 @@ export default function App() {
             setFormData(prev => ({ ...prev, team: value, requesterName: '' }));
         } else if (name === 'value') {
             setFormData(prev => ({ ...prev, [name]: formatValueInput(value) }));
+        } else if (name === 'crm') {
+            const formattedCrm = formatCRM(value);
+            setFormData(prev => {
+                const newState = { ...prev, crm: formattedCrm };
+                if (doctorsDatabase[formattedCrm]) {
+                    newState.doctorName = doctorsDatabase[formattedCrm].name;
+                    newState.category = doctorsDatabase[formattedCrm].category;
+                    try { if (navigator.vibrate) navigator.vibrate([15, 30]); } catch(err){}
+                }
+                return newState;
+            });
         } else {
             setFormData(prev => ({ ...prev, [name]: value }));
         }
@@ -612,6 +662,16 @@ export default function App() {
             setEditingEntry(prev => ({ ...prev, team: value, requesterName: '' }));
         } else if (name === 'value') {
             setEditingEntry(prev => ({ ...prev, [name]: formatValueInput(value) }));
+        } else if (name === 'crm') {
+            const formattedCrm = formatCRM(value);
+            setEditingEntry(prev => {
+                const newState = { ...prev, crm: formattedCrm };
+                if (doctorsDatabase[formattedCrm]) {
+                    newState.doctorName = doctorsDatabase[formattedCrm].name;
+                    newState.category = doctorsDatabase[formattedCrm].category;
+                }
+                return newState;
+            });
         } else {
             setEditingEntry(prev => ({ ...prev, [name]: value }));
         }
@@ -771,12 +831,18 @@ export default function App() {
                                 />
                             </div>
 
-                            <input name="doctorName" value={editingEntry.doctorName} onChange={handleEditChange} placeholder="NOME DO MÉDICO / DESTINATÁRIO" className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl font-bold text-sm outline-none focus:border-emerald-500 transition-all uppercase placeholder:text-slate-400" />
-                            
                             <div className="grid grid-cols-2 gap-4">
-                                <input name="crm" value={editingEntry.crm} onChange={handleEditChange} placeholder="UF-CRM" maxLength={9} className="p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl font-bold text-sm outline-none uppercase focus:border-emerald-500 transition-all placeholder:text-slate-400" />
-                                <input name="value" value={editingEntry.value} onChange={handleEditChange} placeholder="R$ 0,00" className="p-4 bg-emerald-50 border-2 border-emerald-100 rounded-2xl font-black text-emerald-800 text-sm outline-none focus:border-emerald-500 transition-all text-center placeholder:text-emerald-400" />
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-bold text-slate-500 ml-1 uppercase tracking-widest italic">CRM (Busca Auto)</label>
+                                    <input name="crm" value={editingEntry.crm} onChange={handleEditChange} placeholder="UF0000000" maxLength={9} className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl font-bold text-sm outline-none uppercase focus:border-emerald-500 transition-all placeholder:text-slate-400" />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-bold text-slate-500 ml-1 uppercase tracking-widest italic">Valor (R$)</label>
+                                    <input name="value" value={editingEntry.value} onChange={handleEditChange} placeholder="R$ 0,00" className="w-full p-4 bg-emerald-50 border-2 border-emerald-100 rounded-2xl font-black text-emerald-800 text-sm outline-none focus:border-emerald-500 transition-all text-center placeholder:text-emerald-400" />
+                                </div>
                             </div>
+
+                            <input name="doctorName" value={editingEntry.doctorName} onChange={e => setEditingEntry({...editingEntry, doctorName: e.target.value.toUpperCase()})} placeholder="NOME DO MÉDICO / DESTINATÁRIO" className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl font-bold text-sm outline-none focus:border-emerald-500 transition-all uppercase placeholder:text-slate-400" />
 
                             <div className="grid grid-cols-2 gap-4">
                                 <TouchSelect name="category" value={editingEntry.category} onChange={handleEditChange} options={CATEGORIES} placeholder="CATEGORIA" />
@@ -854,25 +920,32 @@ export default function App() {
                                 />
                             </div>
 
-                            <input value={formData.doctorName} onChange={e => setFormData({...formData, doctorName: e.target.value})} placeholder="NOME DO MÉDICO / DESTINATÁRIO" className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl font-bold text-sm outline-none focus:border-emerald-500 transition-all uppercase placeholder:text-slate-400" />
-                            
                             <div className="grid grid-cols-2 gap-4">
-                                <input 
-                                    value={formData.crm} 
-                                    onChange={e => setFormData({...formData, crm: e.target.value})} 
-                                    placeholder="UF-CRM" 
-                                    maxLength={9}
-                                    className="p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl font-bold text-sm outline-none uppercase focus:border-emerald-500 transition-all placeholder:text-slate-400" 
-                                />
-                                <input value={formData.value} onChange={e => setFormData({...formData, value: formatValueInput(e.target.value)})} placeholder="R$ 0,00" className="p-4 bg-emerald-50 border-2 border-emerald-100 rounded-2xl font-black text-emerald-800 text-sm outline-none focus:border-emerald-500 transition-all text-center placeholder:text-emerald-400" />
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-bold text-slate-500 ml-1 uppercase tracking-widest italic">CRM (Busca Auto)</label>
+                                    <input 
+                                        name="crm"
+                                        value={formData.crm} 
+                                        onChange={handleInputChange} 
+                                        placeholder="UF0000000" 
+                                        maxLength={9}
+                                        className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl font-bold text-sm outline-none uppercase focus:border-emerald-500 transition-all placeholder:text-slate-400" 
+                                    />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-bold text-slate-500 ml-1 uppercase tracking-widest italic">Valor (R$)</label>
+                                    <input name="value" value={formData.value} onChange={handleInputChange} placeholder="R$ 0,00" className="w-full p-4 bg-emerald-50 border-2 border-emerald-100 rounded-2xl font-black text-emerald-800 text-sm outline-none focus:border-emerald-500 transition-all text-center placeholder:text-emerald-400" />
+                                </div>
                             </div>
+
+                            <input name="doctorName" value={formData.doctorName} onChange={e => setFormData({...formData, doctorName: e.target.value.toUpperCase()})} placeholder="NOME DO MÉDICO / DESTINATÁRIO" className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl font-bold text-sm outline-none focus:border-emerald-500 transition-all uppercase placeholder:text-slate-400" />
 
                             <div className="grid grid-cols-2 gap-4">
                                 <TouchSelect name="category" value={formData.category} onChange={handleInputChange} options={CATEGORIES} placeholder="CATEGORIA..." />
                                 <TouchSelect name="actionType" value={formData.actionType} onChange={handleInputChange} options={ACTION_TYPES} placeholder="AÇÃO..." />
                             </div>
 
-                            <textarea value={formData.observations} onChange={e => setFormData({...formData, observations: e.target.value})} placeholder="DETALHE A AÇÃO AQUI..." rows="3" className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl text-sm font-medium outline-none focus:border-emerald-500 transition-all uppercase placeholder:text-slate-400" />
+                            <textarea name="observations" value={formData.observations} onChange={handleInputChange} placeholder="DETALHE A AÇÃO AQUI..." rows="3" className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl text-sm font-medium outline-none focus:border-emerald-500 transition-all uppercase placeholder:text-slate-400" />
                             
                             <button type="submit" className="w-full bg-slate-900 text-white font-black py-5 rounded-2xl shadow-2xl active:scale-[0.96] transition-all flex items-center justify-center gap-2 uppercase text-sm tracking-widest mt-4">
                                 Registrar solicitação
@@ -884,7 +957,6 @@ export default function App() {
                 {view === 'history' && (
                     <div className="space-y-5 animate-in slide-in-from-bottom-4 duration-500 pb-10">
                         
-                        {/* Se o administrador usar a aba histórico, garantimos que o select reflete a nova state */}
                         {currentAdmin && currentAdmin.isGeneral && (
                             <select 
                                 value={adminGeneralFilter} 
@@ -1064,9 +1136,6 @@ export default function App() {
                                     <button onClick={logoutAdmin} className="text-xs font-black uppercase bg-rose-500/20 text-rose-400 px-4 py-2.5 rounded-xl active:scale-90 shadow-md border border-rose-500/30 transition-all">Sair</button>
                                 </div>
 
-                                {/* ========================================== */}
-                                {/* NOVO: FILTRO DUPLO DE PESQUISA (GESTOR) */}
-                                {/* ========================================== */}
                                 <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100">
                                     <h3 className="text-[11px] font-black text-slate-800 uppercase tracking-widest mb-5 flex items-center gap-2 border-l-2 border-emerald-500 pl-2">
                                         <span className="text-lg">🔍</span> Filtros de Pesquisa
@@ -1081,7 +1150,7 @@ export default function App() {
                                                     value={adminGeneralFilter} 
                                                     onChange={(e) => {
                                                         setAdminGeneralFilter(e.target.value);
-                                                        setAdminRepFilter('TODOS'); // Zera o representante ao trocar de equipe
+                                                        setAdminRepFilter('TODOS'); 
                                                     }} 
                                                     options={['TODAS AS DISTRITAIS', 'MINHA EQUIPE', ...TEAMS]} 
                                                     placeholder="SELECIONAR DISTRITAL" 
@@ -1180,3 +1249,7 @@ export default function App() {
         </div>
     );
 }
+
+
+```
+
