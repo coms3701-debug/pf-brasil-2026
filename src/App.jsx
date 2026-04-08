@@ -314,7 +314,7 @@ export default function App() {
     // NOVO STATE: Guarda o banco de dados dos médicos
     const [doctorsDatabase, setDoctorsDatabase] = useState({});
 
-    // CARREGA A LISTA DE MÉDICOS DO GITHUB (COM QUEBRADOR DE CACHE EXTREMO)
+    // CARREGA A LISTA DE MÉDICOS DO GITHUB
     useEffect(() => {
         const url = '/medicos.json?v=' + new Date().getTime();
         
@@ -1257,4 +1257,3 @@ export default function App() {
         </div>
     );
 }
-
