@@ -72,7 +72,7 @@ const REPRESENTATIVES = {
     "DISTRITAL SPI/GNY": [
         "JACQUELINE MENEZES", "LINDA LUCIA DE SOUSA ALVES OLIVEIRA", 
         "LADY MARY DE SOUZA ALMEIDA LINHARES", "PAOLA FERNANDA DA SILVA MOSCOSO DE BARROS", 
-        "VERA ALICE BEVEVINO DIAS DE MORAES RIGHETI",  
+        "VERA ALICE BEVEVINO DIAS DE MORAES RIGHETI", 
         "GIOVANA SALAB DEPOLLI", "ARYADINE CARDOSO DE SOUZA", 
         "ANTONIO MARCOS SHIMAZAKI DA SILVA", 
         "JANAINA BEMMUYAL PARENTE SANTOS", "SANDRINE AGNES LUCIE YOUST"    
@@ -89,7 +89,8 @@ const REPRESENTATIVES = {
 
 const ACTION_TYPES = [
     'DIAS DE PRODUTO', 'PRESENTE', 'REFEIÇÃO', 'CONGRESSOS', 
-    'ORGANIZAÇÃO DE AMOSTRAS', 'MINI MEETING', 'EVENTOS', 'COMPRA DE ORIGINAIS', 'MATERIAL GRÁFICO'];
+    'ORGANIZAÇÃO DE AMOSTRAS', 'MINI MEETING', 'EVENTOS', 'COMPRA DE ORIGINAIS', 'MATERIAL GRÁFICO'
+];
 const CATEGORIES = ['CAT 1', 'CAT 2', 'CAT 3', 'CAT 4', 'CAT5', 'OUTROS'];
 
 const ADMIN_USERS = {
@@ -204,9 +205,9 @@ const TouchSelect = ({ name, value, onChange, options, placeholder }) => {
 };
 
 // =========================================================================
-// COMPONENTE: SWIPEABLE ENTRY 
+// COMPONENTE: SWIPEABLE ENTRY (ARRASTAR PARA EDITAR/EXCLUIR)
 // =========================================================================
-const SwipeableEntry = ({ entry, onEdit, onDelete, currentAdmin, adminGeneralFilter }) => {
+const SwipeableEntry = ({ entry, onEdit, onDelete, formatDate }) => {
     const [startX, setStartX] = useState(0);
     const [startY, setStartY] = useState(0);
     const [offsetX, setOffsetX] = useState(0);
@@ -257,23 +258,23 @@ const SwipeableEntry = ({ entry, onEdit, onDelete, currentAdmin, adminGeneralFil
                 onTouchMove={handleMove}
                 onTouchEnd={handleEnd}
                 style={{ transform: `translateX(${offsetX}px)`, transition: offsetX === 0 ? 'transform 0.3s ease' : 'none', touchAction: 'pan-y' }}
-                className="relative bg-white p-4 rounded-2xl shadow-sm flex justify-between items-center z-10"
+                className="relative bg-white p-5 rounded-2xl shadow-sm flex justify-between items-start z-10"
             >
-                <div className="flex-1 min-w-0 pr-2 pointer-events-none">
-                    <div className="flex items-center gap-2 mb-0.5">
-                        <p className="text-[10px] font-bold text-slate-500 uppercase">{entry.requesterName}</p>
-                        {currentAdmin && currentAdmin.isGeneral && adminGeneralFilter === 'ALL' && (
-                            <span className="text-[8px] bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded uppercase font-bold">{entry.team}</span>
-                        )}
+                <div className="min-w-0 pr-4 text-left">
+                    <div className="flex items-center gap-2 mb-2 flex-wrap">
+                        <span className="text-[9px] font-black text-emerald-600 uppercase bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-100">{String(entry.team || 'S/ Equipe')}</span>
                         {formattedActionDate && (
-                            <span className="text-[8px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded uppercase font-bold ml-auto border border-slate-200">
-                                📅 {formattedActionDate}
-                            </span>
+                            <span className="text-[9px] font-bold text-slate-500 uppercase bg-slate-100 px-2.5 py-1 rounded-full border border-slate-200">📅 {formattedActionDate}</span>
                         )}
                     </div>
-                    <p className="font-bold text-slate-800 text-sm truncate">{entry.doctorName} <span className="text-slate-400 font-normal ml-1">({entry.category})</span></p>
-                    <p className="text-xs font-semibold text-slate-600 mt-1">R$ {entry.value} - <span className="font-normal text-slate-500">{entry.actionType}</span></p>
-                    {entry.observations && <p className="text-[10px] text-slate-400 italic mt-1 truncate">Det: {entry.observations}</p>}
+                    <h3 className="font-bold text-slate-800 text-sm truncate uppercase leading-tight">{String(entry.doctorName || '')} <span className="text-slate-400 font-normal ml-1">({String(entry.category || '')})</span></h3>
+                    <p className="text-[11px] text-slate-500 font-bold uppercase truncate opacity-70 mt-0.5">{String(entry.requesterName || '')} • {String(entry.actionType || '')}</p>
+                    {entry.observations && <p className="text-[9px] text-slate-400 italic mt-1.5 truncate">Det: {entry.observations}</p>}
+                </div>
+                <div className="text-right shrink-0 flex flex-col items-end">
+                    <p className="font-black text-slate-900 text-sm uppercase tracking-tighter">R$ {String(entry.value || '0,00')}</p>
+                    <p className="text-[10px] text-slate-400 font-bold mt-1">{formatDate(entry.createdAt)}</p>
+                    <span className="text-[8px] font-black uppercase text-slate-400 mt-3 bg-slate-100 px-2 py-0.5 rounded border border-slate-200 flex items-center gap-1">⇦ DESLIZE</span>
                 </div>
             </div>
         </div>
@@ -291,10 +292,12 @@ export default function App() {
     const [status, setStatus] = useState({ type: '', msg: '' });
     const [showSuccessPopup, setShowSuccessPopup] = useState(false);
     
+    // GESTOR STATES (ATUALIZADOS COM FILTRO DUPLO)
     const [currentAdmin, setCurrentAdmin] = useState(null);
     const [pinInput, setPinInput] = useState('');
     const [adminTab, setAdminTab] = useState('reports'); 
-    const [adminGeneralFilter, setAdminGeneralFilter] = useState('ALL');
+    const [adminGeneralFilter, setAdminGeneralFilter] = useState('TODAS AS DISTRITAIS');
+    const [adminRepFilter, setAdminRepFilter] = useState('TODOS');
     
     const [deleteTarget, setDeleteTarget] = useState(null);
     const [editingEntry, setEditingEntry] = useState(null); 
@@ -410,11 +413,54 @@ export default function App() {
         } catch (e) { return ''; }
     };
 
+    // =========================================================================
+    // LÓGICA DE FILTRAGEM DUPLA (GESTOR)
+    // =========================================================================
+    const effectiveAdminTeam = useMemo(() => {
+        if (!currentAdmin) return null;
+        if (currentAdmin.isGeneral) {
+            if (adminGeneralFilter === 'TODAS AS DISTRITAIS') return null; 
+            if (adminGeneralFilter === 'MINHA EQUIPE') return currentAdmin.team;
+            return adminGeneralFilter;
+        }
+        return currentAdmin.team;
+    }, [currentAdmin, adminGeneralFilter]);
+
+    const adminAvailableReps = useMemo(() => {
+        if (!effectiveAdminTeam) return [];
+        return REPRESENTATIVES[effectiveAdminTeam] || [];
+    }, [effectiveAdminTeam]);
+
+    const filteredEntriesAdmin = useMemo(() => {
+        try {
+            if (!currentAdmin) return [];
+            let base = entries;
+
+            // 1. Filtro de Distrital
+            if (currentAdmin.isGeneral) {
+                if (adminGeneralFilter === 'MINHA EQUIPE') {
+                    base = base.filter(e => e.team === currentAdmin.team);
+                } else if (adminGeneralFilter !== 'TODAS AS DISTRITAIS') {
+                    base = base.filter(e => e.team === adminGeneralFilter);
+                }
+            } else {
+                base = base.filter(e => e.team === currentAdmin.team);
+            }
+
+            // 2. Filtro de Representante
+            if (adminRepFilter && adminRepFilter !== 'TODOS') {
+                base = base.filter(e => e.requesterName === adminRepFilter);
+            }
+
+            return base;
+        } catch(e) { return []; }
+    }, [entries, currentAdmin, adminGeneralFilter, adminRepFilter]);
+
     const currentFeedTeam = useMemo(() => {
         if (currentAdmin) {
             if (currentAdmin.isGeneral) {
-                if (adminGeneralFilter === 'ALL') return 'ALL';
-                if (adminGeneralFilter === 'MINE') return currentAdmin.team;
+                if (adminGeneralFilter === 'TODAS AS DISTRITAIS') return 'ALL';
+                if (adminGeneralFilter === 'MINHA EQUIPE') return currentAdmin.team;
                 return adminGeneralFilter;
             }
             return currentAdmin.team;
@@ -431,18 +477,6 @@ export default function App() {
             return teamBudgets[currentFeedTeam] || '';
         } catch(e) { return ''; }
     }, [currentFeedTeam, teamBudgets, parseCurrency]);
-
-    const filteredEntriesAdmin = useMemo(() => {
-        try {
-            if (!currentAdmin) return [];
-            if (currentAdmin.isGeneral) {
-                if (adminGeneralFilter === 'MINE') return entries.filter(e => e.team === currentAdmin.team);
-                if (adminGeneralFilter !== 'ALL') return entries.filter(e => e.team === adminGeneralFilter);
-                return entries;
-            }
-            return entries.filter(e => e.team === currentAdmin.team);
-        } catch(e) { return []; }
-    }, [entries, currentAdmin, adminGeneralFilter]);
 
     const feedEntries = useMemo(() => {
         try {
@@ -641,18 +675,24 @@ export default function App() {
         }
     };
 
-    const logoutAdmin = () => { setCurrentAdmin(null); setPinInput(''); };
+    const logoutAdmin = () => { 
+        setCurrentAdmin(null); 
+        setPinInput(''); 
+        setAdminGeneralFilter('TODAS AS DISTRITAIS');
+        setAdminRepFilter('TODOS');
+    };
+    
     const currentReps = REPRESENTATIVES[formData.team] || [];
     const editingReps = editingEntry ? (REPRESENTATIVES[editingEntry.team] || []) : [];
 
-    const isAllTeams = currentAdmin && currentAdmin.isGeneral && adminGeneralFilter === 'ALL';
+    const isAllTeams = currentAdmin && currentAdmin.isGeneral && adminGeneralFilter === 'TODAS AS DISTRITAIS';
     const hasNoTeam = !currentAdmin && !formData.team;
     const inputDisabled = isAllTeams || hasNoTeam;
 
     const getFeedTitle = () => {
         if (currentAdmin) {
-            if (currentAdmin.isGeneral && adminGeneralFilter === 'ALL') return "Total Brasil (Geral)";
-            if (currentAdmin.isGeneral && adminGeneralFilter !== 'MINE') return `Total ${adminGeneralFilter}`;
+            if (currentAdmin.isGeneral && adminGeneralFilter === 'TODAS AS DISTRITAIS') return "Total Brasil (Geral)";
+            if (currentAdmin.isGeneral && adminGeneralFilter !== 'MINHA EQUIPE') return `Total ${adminGeneralFilter}`;
             return `Total Equipe (${currentAdmin.team})`;
         }
         return formData.team ? `Seu Total (${formData.team})` : "Seu Total Utilizado";
@@ -844,14 +884,18 @@ export default function App() {
                 {view === 'history' && (
                     <div className="space-y-5 animate-in slide-in-from-bottom-4 duration-500 pb-10">
                         
+                        {/* Se o administrador usar a aba histórico, garantimos que o select reflete a nova state */}
                         {currentAdmin && currentAdmin.isGeneral && (
                             <select 
                                 value={adminGeneralFilter} 
-                                onChange={e => setAdminGeneralFilter(e.target.value)} 
+                                onChange={e => {
+                                    setAdminGeneralFilter(e.target.value);
+                                    setAdminRepFilter('TODOS');
+                                }} 
                                 className="w-full p-3.5 bg-slate-900 text-white rounded-2xl font-bold text-xs outline-none shadow-xl active:scale-[0.98] transition-all uppercase tracking-widest"
                             >
-                                <option value="ALL">🌎 VISÃO GERAL BRASIL (SOMA)</option>
-                                <option value="MINE">👤 MINHA EQUIPE ({currentAdmin.team})</option>
+                                <option value="TODAS AS DISTRITAIS">🌎 VISÃO GERAL BRASIL (SOMA)</option>
+                                <option value="MINHA EQUIPE">👤 MINHA EQUIPE ({currentAdmin.team})</option>
                                 {TEAMS.map(t => <option key={t} value={t}>📍 {t}</option>)}
                             </select>
                         )}
@@ -965,14 +1009,15 @@ export default function App() {
                                     <div key={e.id} className="bg-white p-5 rounded-2xl shadow-md border border-slate-100 flex flex-col active:scale-[0.98] transition-all">
                                         <div className="flex justify-between items-start">
                                             <div className="min-w-0 pr-4 text-left">
-                                                <div className="flex items-center gap-2 mb-2">
+                                                <div className="flex items-center gap-2 mb-2 flex-wrap">
                                                     <span className="text-[9px] font-black text-emerald-600 uppercase bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-100">{String(e.team || 'S/ Equipe')}</span>
                                                     {formattedActionDate && (
                                                         <span className="text-[9px] font-bold text-slate-500 uppercase bg-slate-100 px-2.5 py-1 rounded-full border border-slate-200">📅 {formattedActionDate}</span>
                                                     )}
                                                 </div>
-                                                <h3 className="font-bold text-slate-800 text-sm truncate uppercase leading-tight">{String(e.doctorName || '')}</h3>
+                                                <h3 className="font-bold text-slate-800 text-sm truncate uppercase leading-tight">{String(e.doctorName || '')} <span className="text-slate-400 font-normal ml-1">({String(e.category || '')})</span></h3>
                                                 <p className="text-[11px] text-slate-500 font-bold uppercase truncate opacity-70 mt-0.5">{String(e.requesterName || '')} • {String(e.actionType || '')}</p>
+                                                {e.observations && <p className="text-[9px] text-slate-400 italic mt-1.5 truncate">Det: {e.observations}</p>}
                                             </div>
                                             <div className="text-right shrink-0 flex flex-col items-end">
                                                 <p className="font-black text-slate-900 text-sm uppercase tracking-tighter">R$ {String(e.value || '0,00')}</p>
@@ -980,7 +1025,6 @@ export default function App() {
                                             </div>
                                         </div>
 
-                                        {/* NOVO: Botões Editar e Excluir para o Representante no Feed */}
                                         {!currentAdmin && e.userId === user?.uid && (
                                             <div className="flex justify-end gap-2 mt-4 pt-3 border-t border-slate-50">
                                                 <button onClick={() => setEditingEntry(e)} className="bg-sky-50 text-sky-600 font-bold py-1.5 px-3 rounded-lg text-[10px] uppercase active:scale-90 transition-all border border-sky-100">
@@ -1019,28 +1063,58 @@ export default function App() {
                                     </div>
                                     <button onClick={logoutAdmin} className="text-xs font-black uppercase bg-rose-500/20 text-rose-400 px-4 py-2.5 rounded-xl active:scale-90 shadow-md border border-rose-500/30 transition-all">Sair</button>
                                 </div>
+
+                                {/* ========================================== */}
+                                {/* NOVO: FILTRO DUPLO DE PESQUISA (GESTOR) */}
+                                {/* ========================================== */}
+                                <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100">
+                                    <h3 className="text-[11px] font-black text-slate-800 uppercase tracking-widest mb-5 flex items-center gap-2 border-l-2 border-emerald-500 pl-2">
+                                        <span className="text-lg">🔍</span> Filtros de Pesquisa
+                                    </h3>
+                                    
+                                    <div className="space-y-5">
+                                        {currentAdmin.isGeneral && (
+                                            <div className="space-y-1.5">
+                                                <label className="text-[10px] font-bold text-slate-500 ml-1 uppercase tracking-widest italic">Distrital / Equipe</label>
+                                                <TouchSelect 
+                                                    name="adminGeneralFilter" 
+                                                    value={adminGeneralFilter} 
+                                                    onChange={(e) => {
+                                                        setAdminGeneralFilter(e.target.value);
+                                                        setAdminRepFilter('TODOS'); // Zera o representante ao trocar de equipe
+                                                    }} 
+                                                    options={['TODAS AS DISTRITAIS', 'MINHA EQUIPE', ...TEAMS]} 
+                                                    placeholder="SELECIONAR DISTRITAL" 
+                                                />
+                                            </div>
+                                        )}
+
+                                        <div className={`space-y-1.5 ${effectiveAdminTeam ? 'opacity-100' : 'opacity-50 pointer-events-none'}`}>
+                                            <label className="text-[10px] font-bold text-slate-500 ml-1 uppercase tracking-widest italic">Representante</label>
+                                            <TouchSelect 
+                                                name="adminRepFilter" 
+                                                value={adminRepFilter} 
+                                                onChange={(e) => setAdminRepFilter(e.target.value)} 
+                                                options={['TODOS', ...adminAvailableReps]} 
+                                                placeholder={effectiveAdminTeam ? "TODOS OS REPRESENTANTES" : "SELECIONE UMA DISTRITAL ANTES"} 
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
                                 
                                 <div className="flex bg-slate-200 p-1.5 rounded-2xl shadow-inner text-center">
                                     <button onClick={() => setAdminTab('reports')} className={`flex-1 py-3 text-xs font-black uppercase rounded-xl transition-all ${adminTab === 'reports' ? 'bg-white text-emerald-600 shadow-xl' : 'text-slate-500 hover:text-slate-700'}`}>Relatórios</button>
-                                    <button onClick={() => setAdminTab('manage')} className={`flex-1 py-3 text-xs font-black uppercase rounded-xl transition-all ${adminTab === 'manage' ? 'bg-white text-rose-600 shadow-xl' : 'text-slate-500 hover:text-slate-700'}`}>Editar / Excluir</button>
+                                    <button onClick={() => setAdminTab('manage')} className={`flex-1 py-3 text-xs font-black uppercase rounded-xl transition-all ${adminTab === 'manage' ? 'bg-white text-rose-600 shadow-xl' : 'text-slate-500 hover:text-slate-700'}`}>Feed da Equipe</button>
                                 </div>
 
                                 {adminTab === 'reports' ? (
                                     <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
-                                        {currentAdmin.isGeneral && (
-                                            <select value={adminGeneralFilter} onChange={e => setAdminGeneralFilter(e.target.value)} className="w-full p-4 bg-slate-900 text-white rounded-2xl font-bold text-sm outline-none shadow-2xl active:scale-[0.98] transition-all uppercase tracking-widest">
-                                                <option value="ALL" className="text-[10px]">🌎 VISÃO GERAL BRASIL</option>
-                                                <option value="MINE" className="text-[10px]">👤 MINHA EQUIPE</option>
-                                                {TEAMS.map(t => <option key={t} value={t} className="text-[10px]">📍 {t}</option>)}
-                                            </select>
-                                        )}
-
                                         <div className="grid grid-cols-2 gap-4">
                                             <div className="bg-white p-6 rounded-[2rem] shadow-lg border border-slate-200 text-center uppercase"><p className="text-[10px] font-black text-slate-400 mb-2 tracking-widest leading-none">Investimento</p><h4 className="text-lg font-black text-emerald-600 leading-none">R$ {Number(totalInvestedAdmin).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h4></div>
                                             <div className="bg-white p-6 rounded-[2rem] shadow-lg border border-slate-200 text-center uppercase"><p className="text-[10px] font-black text-slate-400 mb-2 tracking-widest leading-none">Total Lançamentos</p><h4 className="text-3xl font-black text-slate-800 leading-none">{countEntriesAdmin}</h4></div>
                                         </div>
 
-                                        {currentAdmin.isGeneral && (
+                                        {currentAdmin.isGeneral && adminGeneralFilter === 'TODAS AS DISTRITAIS' && (
                                             <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100">
                                                 <h3 className="text-[10px] font-black text-slate-800 uppercase tracking-[0.2em] mb-6 flex items-center gap-2">Total por Distrital</h3>
                                                 <div className="space-y-4 max-h-64 overflow-y-auto pr-2">
@@ -1063,7 +1137,7 @@ export default function App() {
                                         <div className="bg-emerald-50 border border-emerald-100 p-4 rounded-2xl flex items-center justify-between shadow-sm">
                                             <div className="flex items-center gap-3">
                                                 <div className="text-2xl">👉</div>
-                                                <p className="text-[10px] text-emerald-800 font-black uppercase tracking-wider leading-tight">Deslize para a direita<br/><span className="text-emerald-600 font-medium">para editar dados</span></p>
+                                                <p className="text-[10px] text-emerald-800 font-black uppercase tracking-wider leading-tight">Deslize para a direita<br/><span className="text-emerald-600 font-medium">para editar</span></p>
                                             </div>
                                             <div className="w-[1px] h-6 bg-emerald-200"></div>
                                             <div className="flex items-center gap-3">
@@ -1076,12 +1150,19 @@ export default function App() {
                                             <SwipeableEntry 
                                                 key={e.id} 
                                                 entry={e} 
-                                                currentAdmin={currentAdmin} 
-                                                adminGeneralFilter={adminGeneralFilter}
+                                                formatDate={formatDate}
                                                 onEdit={(entry) => setEditingEntry(entry)}
                                                 onDelete={(entry) => setDeleteTarget(entry)}
                                             />
                                         ))}
+
+                                        {filteredEntriesAdmin.length === 0 && (
+                                            <div className="bg-white p-10 rounded-3xl text-center border border-dashed border-slate-300">
+                                                <p className="text-xs font-black text-slate-400 uppercase tracking-widest leading-relaxed">
+                                                    Nenhum lançamento encontrado para os filtros selecionados.
+                                                </p>
+                                            </div>
+                                        )}
                                     </div>
                                 )}
                             </div>
