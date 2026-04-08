@@ -758,7 +758,6 @@ export default function App() {
         return formData.team ? `Seu Total (${formData.team})` : "Seu Total Utilizado";
     };
 
-    // Variável para saber quantos médicos foram carregados
     const numMedicosCarregados = Object.keys(doctorsDatabase).length;
 
     return (
@@ -837,7 +836,7 @@ export default function App() {
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-1.5">
                                     <label className="text-[10px] font-bold text-slate-500 ml-1 uppercase tracking-widest italic">
-                                        CRM {numMedicosCarregados > 0 ? `(AUTO: ${numMedicosCarregados} MÉDICOS)` : '(AUTO)'}
+                                        CRM {numMedicosCarregados > 0 ? `(AUTO: ${numMedicosCarregados} MD)` : '(AUTO)'}
                                     </label>
                                     <input name="crm" value={editingEntry.crm} onChange={handleEditChange} placeholder="UF0000000" maxLength={9} className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl font-bold text-sm outline-none uppercase focus:border-emerald-500 transition-all placeholder:text-slate-400" />
                                 </div>
@@ -930,7 +929,7 @@ export default function App() {
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-1.5">
                                     <label className="text-[10px] font-bold text-slate-500 ml-1 uppercase tracking-widest italic">
-                                        CRM {numMedicosCarregados > 0 ? `(AUTO: ${numMedicosCarregados} MÉDICOS)` : '(AUTO)'}
+                                        CRM {numMedicosCarregados > 0 ? `(AUTO: ${numMedicosCarregados} MD)` : '(AUTO)'}
                                     </label>
                                     <input 
                                         name="crm"
