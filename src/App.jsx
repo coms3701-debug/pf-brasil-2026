@@ -4,6 +4,11 @@ import { getAuth, onAuthStateChanged, signInAnonymously } from 'firebase/auth';
 import { getFirestore, collection, addDoc, onSnapshot, doc, deleteDoc, updateDoc } from 'firebase/firestore';
 
 // =============================================================
+// CONTROLE DE VERSÃO DO APLICATIVO
+// =============================================================
+const APP_VERSION = '2.4.0';
+
+// =============================================================
 // CONFIGURAÇÃO DO BANCO DE DADOS (FIREBASE GOOGLE)
 // =============================================================
 const firebaseConfig = {
@@ -23,7 +28,7 @@ const COLLECTION_NAME = 'pf_budget_oficial_2026';
 
 const TEAMS = [
     "DISTRITAL RIO TOTAL", "DISTRITAL MG/ES", "DISTRITAL NNE", "DISTRITAL SPC1", "DISTRITAL SPC2",
-    "DISTRITAL SPI/BSB", "DISTRITAL SPI/GNY", "DISTRITAL SUL",
+    "DISTRITAL SPI/BSB", "DISTRITAL SPI/GNY",
     "GERENTE NACIONAL DE VISITAÇÃO MÉDICA", "GERENTE NACIONAL DE EXECUÇÃO", "DIRETORIA (MATRIZ)"
 ];
 
@@ -31,11 +36,10 @@ const REPRESENTATIVES = {
     "DISTRITAL RIO TOTAL": ["CARLOS OTAVIO", "LIVIA NUNES DO AMARAL", "VALERIA DIAS DA COSTA", "THAIS SANTANNA RIBEIRO", "CARLOS EDUARDO DO NASCIMENTO SOARES", "FERNANDA DE JESUS NASCIMENTO", "ARTHUR MARILAC FERREIRA", "ELIZABETH LIMA DA SILVA", "CARINA CARVALHO DIAS DE AMORIM", "ROSIMERE MARIA DA SILVA FALCAO", "DEBORAH DE ALMEIDA LEITE PINTO DE LACERDA", "ISIS DE OLIVEIRA ALVES", "PATRICIA MEIRE DE SOUZA IAMIM SILVA"],
     "DISTRITAL MG/ES": ["CALEBE MIRANDA WANDERLEY", "HELOISA DE BARROS", "MARSEILLE COSTA DE CARVALHO", "AMANDA DE OLIVEIRA MOURA", "IZABELA SALES ROCHA DELUCCA", "PAULO MARCIO TOFANI DE MELLO JUNIOR", "KENIA OLIVEIRA CANHESTRO", "KELLY CRISTINA PEREIRA DE ARAUJO","JANAINA BEMMUYAL PARENTE SANTOS", "SANDRINE AGNES LUCIE YOUST"],
     "DISTRITAL NNE": ["SUELLEN VASCONCELOS", "JOSE BERNARDO SOUZA SILVA OLIVEIRA", "ANA ROSA FERREIRA DE MELO VENTURA", "RICARDO JOSE COELHO DE ALBUQUERQUE", "MARCIA CATERINE MELO LIMA DA ROCHA", "FABIANA CRISTINA PINTO TETI MAGALHAES DE MORAES", "FLAVIA MARIA CAVALCANTI MADUREIRA", "KALIANNE FELIX", "LUIS PINHEIRO"],
-    "DISTRITAL SPC1": ["SIDNEI DE SANTIS", "GABRIELA ARAUJO DE PIERI ZAMPIERI", "PAULA NERY ARAGAO", "VALDIRENE COSME DA CONCEICAO DE FLOR", "KARINA PEREIRA SILVA ACTIS", "RAFAEL MENDES PEREIRA", "ROBERTA SALES GADELHA", "SHEILA SANTANA FULNAZARI", "GRAZIELA VICENTE TORRECILLAS", "PAMELA ARAUJO DA COSTA" "LAURO FERREIRA JÚNIOR" "JULIANA STEFANIE OLIVEIRA"],
+    "DISTRITAL SPC1": ["SIDNEI DE SANTIS", "GABRIELA ARAUJO DE PIERI ZAMPIERI", "PAULA NERY ARAGAO", "VALDIRENE COSME DA CONCEICAO DE FLOR", "KARINA PEREIRA SILVA ACTIS", "RAFAEL MENDES PEREIRA", "ROBERTA SALES GADELHA", "SHEILA SANTANA FULNAZARI", "GRAZIELA VICENTE TORRECILLAS", "PAMELA ARAUJO DA COSTA", "LAURO FERREIRA JÚNIOR", "JULIANA STEFANIE OLIVEIRA"],
     "DISTRITAL SPC2": ["VAGO", "DANNY MELO PEREIRA", "SILVIA REGINA LAZINHO", "GISELE MAKUL BIANCO", "MARCEL OLMO FERNANDES BRANCO", "LUCIENE DE SOUZA", "GISLAINE MONTINI BIZINOTTI", "KARINA CAVALCANTI", "VAGO VM", "FLAVIA LUIZA CARDOSO LIUTTI", "VANESSA GARCIA DE OLIVEIRA", "SEBASTIAO ARAUJO ALMEIDA", "TATIANA RODRIGUES DA FONSECA"],
     "DISTRITAL SPI/BSB": ["CARLOS DIAS", "LUCIANA ARAUJO DE OLIVEIRA CAMPOS", "LUCILIA CIBELE DE OLIVEIRA", "GELIANE DE LIMA", "KARINA APARECIDA PADILHA MOTA", "CRISTIANO CARVALHO DO NASCIMENTO", "DOUGLAS RODRIGO MUNHOZ DOMINGOS FIOCHI", "BRUNO CAETANO FELIX", "KELLY FABIANE DA SILVA"],
     "DISTRITAL SPI/GNY": ["JACQUELINE MENEZES", "TATIANE FERRARI", "AMANDA THAIS PICKEL VALERIO", "LINDA LUCIA DE SOUSA ALVES OLIVEIRA", "LADY MARY DE SOUZA ALMEIDA LINHARES", "PAOLA FERNANDA DA SILVA MOSCOSO DE BARROS", "VERA ALICE BEVEVINO DIAS DE MORAES RIGHETI", "GIOVANA SALAB DEPOLLI", "ARYADINE CARDOSO DE SOUZA", "ANTONIO MARCOS SHIMAZAKI DA SILVA"], 
-    "DISTRITAL SUL":
     "GERENTE NACIONAL DE VISITAÇÃO MÉDICA": ["BRUNO JORGE"],
     "GERENTE NACIONAL DE EXECUÇÃO": ["GUSTAVO LIMA"],
     "DIRETORIA (MATRIZ)": ["CARLOS OTAVIO"]
@@ -53,7 +57,6 @@ const ADMIN_USERS = {
     "1005": { name: "GESTOR SPC2", isGeneral: false, team: "DISTRITAL SPC2" },
     "1006": { name: "GESTOR SPI/BSB", isGeneral: false, team: "DISTRITAL SPI/BSB" },
     "1007": { name: "GESTOR SPI/GNY", isGeneral: false, team: "DISTRITAL SPI/GNY" },
-    "1008": { name: "GESTOR SUL", isGeneral: false, team: "DISTRITAL SUL" },
 };
 
 // MÁSCARA AUTOMÁTICA DE CRM (Sem hífen, Limite de 9 dígitos)
@@ -805,9 +808,12 @@ export default function App() {
                     <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center font-black italic shadow-lg text-white">PF</div>
                         <div>
-                            <h1 className="text-base font-black tracking-tight uppercase leading-none">Pierre Fabre</h1>
+                            <div className="flex items-center gap-2">
+                                <h1 className="text-base font-black tracking-tight uppercase leading-none">Pierre Fabre</h1>
+                                <span className="text-[9px] bg-slate-800 text-emerald-400 px-1.5 py-0.5 rounded border border-slate-700 font-bold tracking-widest">V {APP_VERSION}</span>
+                            </div>
                             <p className="text-[10px] text-emerald-400 font-bold tracking-[0.3em] uppercase mt-1">
-                                Corporate Brasil {numMedicosCarregados > 0 ? `• 🟢 ${numMedicosCarregados} MD` : ''}
+                                Corporate Brasil {numMedicosCarregados > 0 ? `• 🟢 ${numMedicosCarregados} MD` : '• 🔴 DB OFF'}
                             </p>
                         </div>
                     </div>
@@ -1037,7 +1043,6 @@ export default function App() {
                                             </div>
                                             <div className="text-right shrink-0 flex flex-col items-end">
                                                 <p className="font-black text-slate-900 text-sm uppercase tracking-tighter">R$ {String(e.value || '0,00')}</p>
-                                                {/* CORREÇÃO DO ERRO AQUI ABAIXO: 'e.createdAt' em vez de 'entry.createdAt' */}
                                                 <p className="text-[10px] text-slate-400 font-bold mt-1">{formatDate(e.createdAt)}</p>
                                             </div>
                                         </div>
@@ -1194,4 +1199,3 @@ export default function App() {
         </div>
     );
 }
-
