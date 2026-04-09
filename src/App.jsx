@@ -53,6 +53,7 @@ const ADMIN_USERS = {
     "1005": { name: "GESTOR SPC2", isGeneral: false, team: "DISTRITAL SPC2" },
     "1006": { name: "GESTOR SPI/BSB", isGeneral: false, team: "DISTRITAL SPI/BSB" },
     "1007": { name: "GESTOR SPI/GNY", isGeneral: false, team: "DISTRITAL SPI/GNY" },
+    "1008": { name: "GESTOR SUL", isGeneral: false, team: "DISTRITAL SUL" },
 };
 
 // MÁSCARA AUTOMÁTICA DE CRM (Sem hífen, Limite de 9 dígitos)
