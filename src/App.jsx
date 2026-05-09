@@ -6,7 +6,7 @@ import { getFirestore, collection, addDoc, onSnapshot, doc, deleteDoc, updateDoc
 // =============================================================
 // CONTROLE DE VERSÃO DO APLICATIVO
 // =============================================================
-const APP_VERSION = '2.4.0';
+const APP_VERSION = '2.5.0';
 
 // =============================================================
 // CONFIGURAÇÃO DO BANCO DE DADOS (FIREBASE GOOGLE)
@@ -59,13 +59,11 @@ const ADMIN_USERS = {
     "1007": { name: "GESTOR SPI/GNY", isGeneral: false, team: "DISTRITAL SPI/GNY" },
 };
 
-// MÁSCARA AUTOMÁTICA DE CRM (Sem hífen, Limite de 9 dígitos)
 const formatCRM = (val) => {
     let v = String(val || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
     return v.substring(0, 9);
 };
 
-// COMPONENTE: TOUCH SELECT
 const TouchSelect = ({ name, value, onChange, options, placeholder }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [highlight, setHighlight] = useState(-1);
@@ -157,7 +155,6 @@ const TouchSelect = ({ name, value, onChange, options, placeholder }) => {
     );
 };
 
-// COMPONENTE: SWIPEABLE ENTRY
 const SwipeableEntry = ({ entry, onEdit, onDelete, formatDate }) => {
     const [startX, setStartX] = useState(0);
     const [startY, setStartY] = useState(0);
@@ -253,10 +250,16 @@ export default function App() {
     const [deleteTarget, setDeleteTarget] = useState(null);
     const [editingEntry, setEditingEntry] = useState(null); 
 
-    // STATE PARA O BANCO DE MÉDICOS
     const [doctorsDatabase, setDoctorsDatabase] = useState({});
 
-    // EFEITO PARA CARREGAR OS MÉDICOS (Com blindagem de erros)
+    // =============================================================
+    // FILTROS DO FEED
+    // =============================================================
+    const [filtersOpen, setFiltersOpen] = useState(false);
+    const [filterDoctor, setFilterDoctor] = useState('');
+    const [filterRep, setFilterRep] = useState('');
+    const [filterActionType, setFilterActionType] = useState('');
+
     useEffect(() => {
         fetch('/medicos.json?v=' + new Date().getTime(), { cache: 'no-store' })
             .then(res => {
@@ -269,9 +272,7 @@ export default function App() {
                     if (m.crm) {
                         const cleanCRM = formatCRM(m.crm);
                         let catFormatada = String(m.categoria || '').trim();
-                        // Transforma "1" em "CAT 1"
                         if (/^\d+$/.test(catFormatada)) catFormatada = `CAT ${catFormatada}`;
-                        
                         const nomeMedico = m.medico || m.nome || '';
                         dbDict[cleanCRM] = { name: nomeMedico, category: catFormatada };
                     }
@@ -473,6 +474,33 @@ export default function App() {
         catch(e) { return 0; }
     }, [displayBudgetCeiling, totalUsedFeed]);
 
+    // =============================================================
+    // OPÇÕES DINÂMICAS E ENTRADAS FILTRADAS DO FEED
+    // =============================================================
+    const filterDoctorOptions = useMemo(() => 
+        [...new Set(feedEntries.map(e => String(e.doctorName || '')).filter(Boolean))].sort()
+    , [feedEntries]);
+
+    const filterRepOptions = useMemo(() => 
+        [...new Set(feedEntries.map(e => String(e.requesterName || '')).filter(Boolean))].sort()
+    , [feedEntries]);
+
+    const filteredFeedEntries = useMemo(() => {
+        let result = feedEntries;
+        if (filterDoctor) result = result.filter(e => e.doctorName === filterDoctor);
+        if (filterRep) result = result.filter(e => e.requesterName === filterRep);
+        if (filterActionType) result = result.filter(e => e.actionType === filterActionType);
+        return result;
+    }, [feedEntries, filterDoctor, filterRep, filterActionType]);
+
+    const activeFilterCount = [filterDoctor, filterRep, filterActionType].filter(Boolean).length;
+
+    const clearFilters = () => {
+        setFilterDoctor('');
+        setFilterRep('');
+        setFilterActionType('');
+    };
+
     const exportToCSV = () => {
         try {
             const dataToExport = currentAdmin ? filteredEntriesAdmin : feedEntries;
@@ -572,7 +600,6 @@ export default function App() {
         } catch(e) { return []; }
     }, [filteredEntriesAdmin, parseCurrency]);
 
-    // PREENCHIMENTO AUTOMÁTICO DO MÉDICO E DA CATEGORIA
     const handleInputChange = (e) => {
         const { name, value } = e.target;
         if (name === 'team') {
@@ -774,9 +801,7 @@ export default function App() {
 
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-1.5">
-                                    <label className="text-[10px] font-bold text-slate-500 ml-1 uppercase tracking-widest italic">
-                                        CRM
-                                    </label>
+                                    <label className="text-[10px] font-bold text-slate-500 ml-1 uppercase tracking-widest italic">CRM</label>
                                     <input name="crm" value={editingEntry.crm} onChange={handleEditChange} placeholder="UF0000000" maxLength={9} className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl font-bold text-sm outline-none uppercase focus:border-emerald-500 transition-all placeholder:text-slate-400" />
                                 </div>
                                 <div className="space-y-1.5">
@@ -870,9 +895,7 @@ export default function App() {
 
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-1.5">
-                                    <label className="text-[10px] font-bold text-slate-500 ml-1 uppercase tracking-widest italic">
-                                        CRM
-                                    </label>
+                                    <label className="text-[10px] font-bold text-slate-500 ml-1 uppercase tracking-widest italic">CRM</label>
                                     <input 
                                         name="crm"
                                         value={formData.crm} 
@@ -1010,22 +1033,94 @@ export default function App() {
                             </div>
                         </div>
 
-                        <div className="flex justify-between items-center px-3 mt-8">
+                        {/* ===== PAINEL DE FILTROS ===== */}
+                        <div className="space-y-2">
+                            <button
+                                onClick={() => setFiltersOpen(prev => !prev)}
+                                className="w-full flex items-center justify-between bg-white border border-slate-200 rounded-2xl px-4 py-3.5 shadow-sm active:scale-[0.98] transition-all"
+                            >
+                                <div className="flex items-center gap-2.5">
+                                    <span className="text-base">🔍</span>
+                                    <span className="text-xs font-black uppercase tracking-widest text-slate-700">Filtrar Lista</span>
+                                    {activeFilterCount > 0 && (
+                                        <span className="bg-emerald-500 text-white text-[9px] font-black px-2 py-0.5 rounded-full leading-none">
+                                            {activeFilterCount} ativo{activeFilterCount > 1 ? 's' : ''}
+                                        </span>
+                                    )}
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    {activeFilterCount > 0 && (
+                                        <span
+                                            onClick={e => { e.stopPropagation(); clearFilters(); }}
+                                            className="text-[9px] font-black text-rose-500 uppercase bg-rose-50 px-2 py-1 rounded-lg border border-rose-100 active:scale-90 transition-all"
+                                        >
+                                            Limpar
+                                        </span>
+                                    )}
+                                    <span className="text-slate-400 text-[10px] font-bold">{filtersOpen ? '▲' : '▼'}</span>
+                                </div>
+                            </button>
+
+                            {filtersOpen && (
+                                <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 space-y-3 animate-in slide-in-from-top-2 duration-200">
+                                    <div className="space-y-1">
+                                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Médico</label>
+                                        <select
+                                            value={filterDoctor}
+                                            onChange={e => setFilterDoctor(e.target.value)}
+                                            className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-[11px] font-bold text-slate-700 uppercase outline-none focus:border-emerald-500 transition-all"
+                                        >
+                                            <option value="">TODOS OS MÉDICOS</option>
+                                            {filterDoctorOptions.map(d => <option key={d} value={d}>{d}</option>)}
+                                        </select>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Representante</label>
+                                        <select
+                                            value={filterRep}
+                                            onChange={e => setFilterRep(e.target.value)}
+                                            className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-[11px] font-bold text-slate-700 uppercase outline-none focus:border-emerald-500 transition-all"
+                                        >
+                                            <option value="">TODOS OS REPRESENTANTES</option>
+                                            {filterRepOptions.map(r => <option key={r} value={r}>{r}</option>)}
+                                        </select>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Tipo de Ação</label>
+                                        <select
+                                            value={filterActionType}
+                                            onChange={e => setFilterActionType(e.target.value)}
+                                            className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-[11px] font-bold text-slate-700 uppercase outline-none focus:border-emerald-500 transition-all"
+                                        >
+                                            <option value="">TODOS OS TIPOS</option>
+                                            {ACTION_TYPES.map(a => <option key={a} value={a}>{a}</option>)}
+                                        </select>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="flex justify-between items-center px-3">
                             <h2 className="text-xs font-black text-slate-400 uppercase tracking-widest border-l-4 border-emerald-500 pl-2">
                                 Lista de Atividades
+                                {activeFilterCount > 0 && (
+                                    <span className="ml-2 text-emerald-600 normal-case font-bold">({filteredFeedEntries.length} de {feedEntries.length})</span>
+                                )}
                             </h2>
                         </div>
                         
-                        {feedEntries.length === 0 ? (
+                        {filteredFeedEntries.length === 0 ? (
                             <div className="bg-white p-10 rounded-3xl text-center border border-dashed border-slate-300">
                                 <p className="text-xs font-black text-slate-400 uppercase tracking-widest leading-relaxed">
                                     {!formData.requesterName && !currentAdmin
                                         ? "Selecione seu nome na aba NOVO para visualizar."
+                                        : activeFilterCount > 0
+                                        ? "Nenhum resultado para os filtros aplicados."
                                         : "Nenhum lançamento encontrado."}
                                 </p>
                             </div>
                         ) : (
-                            feedEntries.map(e => {
+                            filteredFeedEntries.map(e => {
                                 const formattedActionDate = e.actionDate ? new Date(e.actionDate + 'T12:00:00').toLocaleDateString('pt-BR') : '';
                                 return (
                                     <div key={e.id} className="bg-white p-5 rounded-2xl shadow-md border border-slate-100 flex flex-col active:scale-[0.98] transition-all">
