@@ -6,7 +6,7 @@ import { getFirestore, collection, addDoc, onSnapshot, doc, deleteDoc, updateDoc
 // =============================================================
 // CONTROLE DE VERSÃO DO APLICATIVO
 // =============================================================
-const APP_VERSION = '2.5.0';
+const APP_VERSION = '2.6.0';
 
 // =============================================================
 // CONFIGURAÇÃO DO BANCO DE DADOS (FIREBASE GOOGLE)
@@ -155,6 +155,144 @@ const TouchSelect = ({ name, value, onChange, options, placeholder }) => {
     );
 };
 
+// =============================================================
+// COMPONENTE: MULTI-SELECT COM BUSCA
+// =============================================================
+const MultiSelectSearch = ({ values, onChange, options, placeholder, label }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const [search, setSearch] = useState('');
+
+    useEffect(() => {
+        if (isOpen) document.body.style.overflow = 'hidden';
+        else document.body.style.overflow = 'unset';
+        return () => { document.body.style.overflow = 'unset'; };
+    }, [isOpen]);
+
+    const filteredOptions = useMemo(() => {
+        const s = search.trim().toLowerCase();
+        if (!s) return options;
+        return options.filter(o => String(o).toLowerCase().includes(s));
+    }, [options, search]);
+
+    const toggle = (opt) => {
+        if (values.includes(opt)) {
+            onChange(values.filter(v => v !== opt));
+        } else {
+            onChange([...values, opt]);
+        }
+        try { if (navigator.vibrate) navigator.vibrate(10); } catch(e){}
+    };
+
+    const close = () => {
+        setIsOpen(false);
+        setSearch('');
+    };
+
+    const displayText = values.length === 0 
+        ? placeholder 
+        : values.length === 1 
+            ? values[0] 
+            : `${values.length} SELECIONADOS`;
+
+    return (
+        <>
+            <div className="space-y-1">
+                {label && <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1 block">{label}</label>}
+                <div 
+                    onClick={() => setIsOpen(true)} 
+                    className={`w-full p-3 border-2 rounded-xl font-bold text-[11px] outline-none transition-all active:scale-[0.98] flex justify-between items-center cursor-pointer ${values.length > 0 ? 'bg-emerald-50 border-emerald-200' : 'bg-slate-50 border-slate-200'}`}
+                >
+                    <span className={`uppercase truncate pr-2 ${values.length > 0 ? "text-emerald-700" : "text-slate-400"}`}>
+                        {displayText}
+                    </span>
+                    <span className="text-slate-400 text-[10px] shrink-0">▼</span>
+                </div>
+            </div>
+            
+            {isOpen && (
+                <div className="fixed inset-0 z-[120] flex items-end justify-center bg-slate-900/60 backdrop-blur-sm" onClick={close}>
+                    <div 
+                        className="w-full max-w-md bg-white rounded-t-[2.5rem] p-5 pb-8 shadow-2xl flex flex-col max-h-[85vh]"
+                        onClick={e => e.stopPropagation()}
+                    >
+                        <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-4 shrink-0"></div>
+
+                        {label && (
+                            <p className="text-[10px] font-black text-slate-500 mb-3 uppercase text-center tracking-widest shrink-0">
+                                {label}
+                            </p>
+                        )}
+
+                        <div className="flex items-center gap-2 mb-3 shrink-0">
+                            <div className="flex-1 relative">
+                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm pointer-events-none">🔎</span>
+                                <input 
+                                    autoFocus
+                                    value={search}
+                                    onChange={e => setSearch(e.target.value)}
+                                    placeholder="BUSCAR..."
+                                    className="w-full pl-10 pr-3 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl text-xs font-bold uppercase outline-none focus:border-emerald-500 placeholder:text-slate-400"
+                                />
+                            </div>
+                            {values.length > 0 && (
+                                <button 
+                                    onClick={() => onChange([])}
+                                    className="text-[9px] font-black text-rose-500 uppercase bg-rose-50 px-3 py-2.5 rounded-lg border border-rose-100 active:scale-90 transition-all shrink-0"
+                                >
+                                    Limpar
+                                </button>
+                            )}
+                        </div>
+
+                        {values.length > 0 && (
+                            <div className="flex flex-wrap gap-1.5 mb-3 shrink-0 max-h-24 overflow-y-auto pb-1">
+                                {values.map(v => (
+                                    <span 
+                                        key={v} 
+                                        onClick={() => toggle(v)}
+                                        className="text-[9px] font-black bg-emerald-500 text-white px-2 py-1 rounded-full uppercase cursor-pointer active:scale-90 transition-all flex items-center gap-1.5 shrink-0"
+                                    >
+                                        {v} <span className="text-emerald-200 text-[11px] leading-none">✕</span>
+                                    </span>
+                                ))}
+                            </div>
+                        )}
+
+                        <div className="space-y-1 overflow-y-auto flex-1 -mx-1 px-1">
+                            {filteredOptions.length === 0 ? (
+                                <p className="text-center text-xs text-slate-400 font-bold py-8 uppercase tracking-widest">Nenhum resultado</p>
+                            ) : (
+                                filteredOptions.map((opt) => {
+                                    const selected = values.includes(opt);
+                                    return (
+                                        <div 
+                                            key={opt} 
+                                            onClick={() => toggle(opt)}
+                                            className={`p-3 rounded-xl transition-all duration-75 cursor-pointer border flex items-center gap-3 ${selected ? 'bg-emerald-50 border-emerald-200' : 'bg-slate-50 border-slate-100 active:bg-slate-100'}`}
+                                        >
+                                            <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition-all ${selected ? 'bg-emerald-500 border-emerald-500' : 'bg-white border-slate-300'}`}>
+                                                {selected && <span className="text-white text-[10px] font-black leading-none">✓</span>}
+                                            </div>
+                                            <span className={`text-xs font-bold uppercase truncate ${selected ? 'text-emerald-800' : 'text-slate-700'}`}>{opt}</span>
+                                        </div>
+                                    );
+                                })
+                            )}
+                        </div>
+                        
+                        <button 
+                            onClick={close}
+                            className="w-full mt-4 bg-slate-900 text-white font-black py-3.5 rounded-xl text-xs uppercase tracking-widest active:scale-95 transition-all shrink-0"
+                        >
+                            Aplicar ({values.length} selecionado{values.length !== 1 ? 's' : ''})
+                        </button>
+                    </div>
+                </div>
+            )}
+        </>
+    );
+};
+
 const SwipeableEntry = ({ entry, onEdit, onDelete, formatDate }) => {
     const [startX, setStartX] = useState(0);
     const [startY, setStartY] = useState(0);
@@ -240,7 +378,6 @@ export default function App() {
     const [status, setStatus] = useState({ type: '', msg: '' });
     const [showSuccessPopup, setShowSuccessPopup] = useState(false);
     
-    // GESTOR STATES
     const [currentAdmin, setCurrentAdmin] = useState(null);
     const [pinInput, setPinInput] = useState('');
     const [adminTab, setAdminTab] = useState('reports'); 
@@ -253,12 +390,12 @@ export default function App() {
     const [doctorsDatabase, setDoctorsDatabase] = useState({});
 
     // =============================================================
-    // FILTROS DO FEED
+    // FILTROS DO FEED (MULTI-SELEÇÃO)
     // =============================================================
     const [filtersOpen, setFiltersOpen] = useState(false);
-    const [filterDoctor, setFilterDoctor] = useState('');
-    const [filterRep, setFilterRep] = useState('');
-    const [filterActionType, setFilterActionType] = useState('');
+    const [filterDoctors, setFilterDoctors] = useState([]);
+    const [filterReps, setFilterReps] = useState([]);
+    const [filterActionTypes, setFilterActionTypes] = useState([]);
 
     useEffect(() => {
         fetch('/medicos.json?v=' + new Date().getTime(), { cache: 'no-store' })
@@ -456,6 +593,7 @@ export default function App() {
         } catch(e) { return ''; }
     }, [currentFeedTeam, teamBudgets, parseCurrency]);
 
+    // BASE DO FEED (sem filtros locais)
     const feedEntries = useMemo(() => {
         try {
             if (currentAdmin) return filteredEntriesAdmin; 
@@ -464,19 +602,7 @@ export default function App() {
         } catch(e) { return []; }
     }, [entries, currentAdmin, filteredEntriesAdmin, formData.requesterName]);
 
-    const totalUsedFeed = useMemo(() => {
-        try { return feedEntries.reduce((acc, curr) => acc + parseCurrency(curr.value), 0); } 
-        catch(e) { return 0; }
-    }, [feedEntries, parseCurrency]);
-    
-    const budgetBalance = useMemo(() => {
-        try { return parseCurrency(displayBudgetCeiling) - totalUsedFeed; } 
-        catch(e) { return 0; }
-    }, [displayBudgetCeiling, totalUsedFeed]);
-
-    // =============================================================
-    // OPÇÕES DINÂMICAS E ENTRADAS FILTRADAS DO FEED
-    // =============================================================
+    // OPÇÕES DOS FILTROS (derivadas do feed base, antes dos filtros locais)
     const filterDoctorOptions = useMemo(() => 
         [...new Set(feedEntries.map(e => String(e.doctorName || '')).filter(Boolean))].sort()
     , [feedEntries]);
@@ -485,25 +611,41 @@ export default function App() {
         [...new Set(feedEntries.map(e => String(e.requesterName || '')).filter(Boolean))].sort()
     , [feedEntries]);
 
+    const filterActionOptions = useMemo(() => 
+        [...new Set(feedEntries.map(e => String(e.actionType || '')).filter(Boolean))].sort()
+    , [feedEntries]);
+
+    // FEED FILTRADO (após filtros locais) - usado em TODOS os totais e listas
     const filteredFeedEntries = useMemo(() => {
         let result = feedEntries;
-        if (filterDoctor) result = result.filter(e => e.doctorName === filterDoctor);
-        if (filterRep) result = result.filter(e => e.requesterName === filterRep);
-        if (filterActionType) result = result.filter(e => e.actionType === filterActionType);
+        if (filterDoctors.length > 0) result = result.filter(e => filterDoctors.includes(e.doctorName));
+        if (filterReps.length > 0) result = result.filter(e => filterReps.includes(e.requesterName));
+        if (filterActionTypes.length > 0) result = result.filter(e => filterActionTypes.includes(e.actionType));
         return result;
-    }, [feedEntries, filterDoctor, filterRep, filterActionType]);
+    }, [feedEntries, filterDoctors, filterReps, filterActionTypes]);
 
-    const activeFilterCount = [filterDoctor, filterRep, filterActionType].filter(Boolean).length;
+    const activeFilterCount = filterDoctors.length + filterReps.length + filterActionTypes.length;
 
     const clearFilters = () => {
-        setFilterDoctor('');
-        setFilterRep('');
-        setFilterActionType('');
+        setFilterDoctors([]);
+        setFilterReps([]);
+        setFilterActionTypes([]);
     };
+
+    // TOTAIS RELACIONADOS AO FEED FILTRADO
+    const totalUsedFeed = useMemo(() => {
+        try { return filteredFeedEntries.reduce((acc, curr) => acc + parseCurrency(curr.value), 0); } 
+        catch(e) { return 0; }
+    }, [filteredFeedEntries, parseCurrency]);
+    
+    const budgetBalance = useMemo(() => {
+        try { return parseCurrency(displayBudgetCeiling) - totalUsedFeed; } 
+        catch(e) { return 0; }
+    }, [displayBudgetCeiling, totalUsedFeed]);
 
     const exportToCSV = () => {
         try {
-            const dataToExport = currentAdmin ? filteredEntriesAdmin : feedEntries;
+            const dataToExport = currentAdmin ? filteredFeedEntries : filteredFeedEntries;
             if (dataToExport.length === 0) return notify("Não existem dados para exportar.", "error");
 
             const headers = ["Data Insercao", "Data da Acao", "Estrutura", "Solicitante", "Medico/Destinatario", "CRM", "Categoria", "Acao", "Valor", "Observacoes"];
@@ -528,9 +670,10 @@ export default function App() {
         } catch (err) { notify("Falha ao exportar", "error"); }
     };
 
+    // STATS RELACIONADAS AO FEED FILTRADO
     const feedStatsByRep = useMemo(() => {
         try {
-            const groups = feedEntries.reduce((acc, curr) => {
+            const groups = filteredFeedEntries.reduce((acc, curr) => {
                 const name = String(curr.requesterName || "NÃO IDENTIFICADO");
                 if (!acc[name]) acc[name] = { total: 0, count: 0 };
                 acc[name].total += parseCurrency(curr.value);
@@ -539,11 +682,11 @@ export default function App() {
             }, {});
             return Object.entries(groups).map(([name, data]) => ({ name, ...data })).sort((a, b) => b.total - a.total);
         } catch(e) { return []; }
-    }, [feedEntries, parseCurrency]);
+    }, [filteredFeedEntries, parseCurrency]);
 
     const feedStatsByAction = useMemo(() => {
         try {
-            const groups = feedEntries.reduce((acc, curr) => {
+            const groups = filteredFeedEntries.reduce((acc, curr) => {
                 const type = String(curr.actionType || "NÃO DEFINIDA");
                 if (!acc[type]) acc[type] = { total: 0, count: 0 };
                 acc[type].total += parseCurrency(curr.value);
@@ -552,11 +695,11 @@ export default function App() {
             }, {});
             return Object.entries(groups).map(([name, data]) => ({ name, ...data })).sort((a, b) => b.total - a.total);
         } catch(e) { return []; }
-    }, [feedEntries, parseCurrency]);
+    }, [filteredFeedEntries, parseCurrency]);
 
     const feedStatsByDoctor = useMemo(() => {
         try {
-            const groups = feedEntries.reduce((acc, curr) => {
+            const groups = filteredFeedEntries.reduce((acc, curr) => {
                 const crmKey = String(curr.crm || "").trim().toUpperCase();
                 const groupKey = crmKey || String(curr.doctorName || "DESCONHECIDO").trim().toUpperCase();
                 if (!acc[groupKey]) {
@@ -579,7 +722,7 @@ export default function App() {
             }, {});
             return Object.values(groups).sort((a, b) => b.total - a.total);
         } catch(e) { return []; }
-    }, [feedEntries, parseCurrency]);
+    }, [filteredFeedEntries, parseCurrency]);
 
     const countEntriesAdmin = filteredEntriesAdmin.length;
     const totalInvestedAdmin = useMemo(() => {
@@ -706,6 +849,7 @@ export default function App() {
         setPinInput(''); 
         setAdminGeneralFilter('TODAS AS DISTRITAIS');
         setAdminRepFilter('TODOS');
+        clearFilters();
     };
     
     const currentReps = REPRESENTATIVES[formData.team] || [];
@@ -936,6 +1080,7 @@ export default function App() {
                                 onChange={e => {
                                     setAdminGeneralFilter(e.target.value);
                                     setAdminRepFilter('TODOS');
+                                    clearFilters();
                                 }} 
                                 className="w-full p-3.5 bg-slate-900 text-white rounded-2xl font-bold text-xs outline-none shadow-xl active:scale-[0.98] transition-all uppercase tracking-widest"
                             >
@@ -950,13 +1095,13 @@ export default function App() {
                             <div className="flex justify-between items-center border-b border-slate-800 pb-4 relative z-10">
                                 <div>
                                     <p className="text-[10px] font-black text-emerald-400 uppercase tracking-[0.2em] mb-1">
-                                        {getFeedTitle()}
+                                        {getFeedTitle()} {activeFilterCount > 0 && <span className="text-amber-400">• FILTRADO</span>}
                                     </p>
                                     <h4 className="text-2xl font-black tracking-tight">R$ {Number(totalUsedFeed).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h4>
                                 </div>
                                 <div className="text-right">
                                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">Registos</p>
-                                    <h4 className="text-2xl font-black text-slate-300">{feedEntries.length}</h4>
+                                    <h4 className="text-2xl font-black text-slate-300">{filteredFeedEntries.length}</h4>
                                 </div>
                             </div>
                             <div className="grid grid-cols-2 gap-5 relative z-10">
@@ -979,6 +1124,61 @@ export default function App() {
                                     </h4>
                                 </div>
                             </div>
+                        </div>
+
+                        {/* ===== PAINEL DE FILTROS (LOGO ABAIXO DO CARD ESCURO) ===== */}
+                        <div className="space-y-2">
+                            <button
+                                onClick={() => setFiltersOpen(prev => !prev)}
+                                className={`w-full flex items-center justify-between border rounded-2xl px-4 py-3.5 shadow-sm active:scale-[0.98] transition-all ${activeFilterCount > 0 ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-slate-200'}`}
+                            >
+                                <div className="flex items-center gap-2.5">
+                                    <span className="text-base">🔍</span>
+                                    <span className="text-xs font-black uppercase tracking-widest text-slate-700">Filtrar Lista</span>
+                                    {activeFilterCount > 0 && (
+                                        <span className="bg-emerald-500 text-white text-[9px] font-black px-2 py-0.5 rounded-full leading-none">
+                                            {activeFilterCount} ativo{activeFilterCount > 1 ? 's' : ''}
+                                        </span>
+                                    )}
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    {activeFilterCount > 0 && (
+                                        <span
+                                            onClick={e => { e.stopPropagation(); clearFilters(); }}
+                                            className="text-[9px] font-black text-rose-500 uppercase bg-rose-50 px-2 py-1 rounded-lg border border-rose-100 active:scale-90 transition-all"
+                                        >
+                                            Limpar
+                                        </span>
+                                    )}
+                                    <span className="text-slate-400 text-[10px] font-bold">{filtersOpen ? '▲' : '▼'}</span>
+                                </div>
+                            </button>
+
+                            {filtersOpen && (
+                                <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 space-y-3 animate-in slide-in-from-top-2 duration-200">
+                                    <MultiSelectSearch
+                                        values={filterDoctors}
+                                        onChange={setFilterDoctors}
+                                        options={filterDoctorOptions}
+                                        placeholder="TODOS OS MÉDICOS"
+                                        label="Médico"
+                                    />
+                                    <MultiSelectSearch
+                                        values={filterReps}
+                                        onChange={setFilterReps}
+                                        options={filterRepOptions}
+                                        placeholder="TODOS OS REPRESENTANTES"
+                                        label="Representante"
+                                    />
+                                    <MultiSelectSearch
+                                        values={filterActionTypes}
+                                        onChange={setFilterActionTypes}
+                                        options={filterActionOptions.length > 0 ? filterActionOptions : ACTION_TYPES}
+                                        placeholder="TODOS OS TIPOS"
+                                        label="Tipo de Ação"
+                                    />
+                                </div>
+                            )}
                         </div>
 
                         <div className="space-y-4">
@@ -1033,74 +1233,7 @@ export default function App() {
                             </div>
                         </div>
 
-                        {/* ===== PAINEL DE FILTROS ===== */}
-                        <div className="space-y-2">
-                            <button
-                                onClick={() => setFiltersOpen(prev => !prev)}
-                                className="w-full flex items-center justify-between bg-white border border-slate-200 rounded-2xl px-4 py-3.5 shadow-sm active:scale-[0.98] transition-all"
-                            >
-                                <div className="flex items-center gap-2.5">
-                                    <span className="text-base">🔍</span>
-                                    <span className="text-xs font-black uppercase tracking-widest text-slate-700">Filtrar Lista</span>
-                                    {activeFilterCount > 0 && (
-                                        <span className="bg-emerald-500 text-white text-[9px] font-black px-2 py-0.5 rounded-full leading-none">
-                                            {activeFilterCount} ativo{activeFilterCount > 1 ? 's' : ''}
-                                        </span>
-                                    )}
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    {activeFilterCount > 0 && (
-                                        <span
-                                            onClick={e => { e.stopPropagation(); clearFilters(); }}
-                                            className="text-[9px] font-black text-rose-500 uppercase bg-rose-50 px-2 py-1 rounded-lg border border-rose-100 active:scale-90 transition-all"
-                                        >
-                                            Limpar
-                                        </span>
-                                    )}
-                                    <span className="text-slate-400 text-[10px] font-bold">{filtersOpen ? '▲' : '▼'}</span>
-                                </div>
-                            </button>
-
-                            {filtersOpen && (
-                                <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 space-y-3 animate-in slide-in-from-top-2 duration-200">
-                                    <div className="space-y-1">
-                                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Médico</label>
-                                        <select
-                                            value={filterDoctor}
-                                            onChange={e => setFilterDoctor(e.target.value)}
-                                            className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-[11px] font-bold text-slate-700 uppercase outline-none focus:border-emerald-500 transition-all"
-                                        >
-                                            <option value="">TODOS OS MÉDICOS</option>
-                                            {filterDoctorOptions.map(d => <option key={d} value={d}>{d}</option>)}
-                                        </select>
-                                    </div>
-                                    <div className="space-y-1">
-                                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Representante</label>
-                                        <select
-                                            value={filterRep}
-                                            onChange={e => setFilterRep(e.target.value)}
-                                            className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-[11px] font-bold text-slate-700 uppercase outline-none focus:border-emerald-500 transition-all"
-                                        >
-                                            <option value="">TODOS OS REPRESENTANTES</option>
-                                            {filterRepOptions.map(r => <option key={r} value={r}>{r}</option>)}
-                                        </select>
-                                    </div>
-                                    <div className="space-y-1">
-                                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Tipo de Ação</label>
-                                        <select
-                                            value={filterActionType}
-                                            onChange={e => setFilterActionType(e.target.value)}
-                                            className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-[11px] font-bold text-slate-700 uppercase outline-none focus:border-emerald-500 transition-all"
-                                        >
-                                            <option value="">TODOS OS TIPOS</option>
-                                            {ACTION_TYPES.map(a => <option key={a} value={a}>{a}</option>)}
-                                        </select>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-
-                        <div className="flex justify-between items-center px-3">
+                        <div className="flex justify-between items-center px-3 mt-4">
                             <h2 className="text-xs font-black text-slate-400 uppercase tracking-widest border-l-4 border-emerald-500 pl-2">
                                 Lista de Atividades
                                 {activeFilterCount > 0 && (
@@ -1196,6 +1329,7 @@ export default function App() {
                                                     onChange={(e) => {
                                                         setAdminGeneralFilter(e.target.value);
                                                         setAdminRepFilter('TODOS'); 
+                                                        clearFilters();
                                                     }} 
                                                     options={['TODAS AS DISTRITAIS', 'MINHA EQUIPE', ...TEAMS]} 
                                                     placeholder="SELECIONAR DISTRITAL" 
