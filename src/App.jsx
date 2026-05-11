@@ -6,7 +6,7 @@ import { getFirestore, collection, addDoc, onSnapshot, doc, deleteDoc, updateDoc
 // =============================================================
 // CONTROLE DE VERSÃO DO APLICATIVO
 // =============================================================
-const APP_VERSION = '2.6.1';
+const APP_VERSION = '2.6.2';
 
 // =============================================================
 // CONFIGURAÇÃO DO BANCO DE DADOS (FIREBASE GOOGLE)
@@ -1184,7 +1184,7 @@ export default function App() {
                         <div className="space-y-4">
                             {feedStatsByRep.length > 0 && currentAdmin && (
                                 <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
-                                    <h3 className="text-[10px] font-black text-slate-800 uppercase tracking-widest mb-3 border-l-2 border-emerald-500 pl-2">Top Representantes</h3>
+                                    <h3 className="text-[10px] font-black text-slate-800 uppercase tracking-widest mb-3 border-l-2 border-emerald-500 pl-2">Investimento por VM</h3>
                                     <div className="space-y-2 max-h-32 overflow-y-auto pr-2">
                                         {feedStatsByRep.map((s, i) => (
                                             <div key={i} className="flex justify-between items-center text-xs border-b border-slate-50 pb-1.5 last:border-0">
@@ -1195,6 +1195,53 @@ export default function App() {
                                     </div>
                                 </div>
                             )}
+
+                            {(() => {
+                                const actineEntries = filteredFeedEntries
+                                    .filter(e => String(e.actionType || '').toUpperCase() === 'VERBA REVERSÃO ACTINE')
+                                    .slice()
+                                    .sort((a, b) => {
+                                        const at = (a.createdAt && typeof a.createdAt.getTime === 'function') ? a.createdAt.getTime() : 0;
+                                        const bt = (b.createdAt && typeof b.createdAt.getTime === 'function') ? b.createdAt.getTime() : 0;
+                                        return bt - at;
+                                    });
+                                if (actineEntries.length === 0) return null;
+                                const actineTotal = actineEntries.reduce((acc, curr) => acc + parseCurrency(curr.value), 0);
+                                return (
+                                    <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
+                                        <div className="flex justify-between items-center mb-3 border-l-2 border-amber-500 pl-2">
+                                            <h3 className="text-[10px] font-black text-slate-800 uppercase tracking-widest">Ações Actine</h3>
+                                            <span className="text-[10px] font-black text-amber-600">R$ {Number(actineTotal).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} • {actineEntries.length}</span>
+                                        </div>
+                                        <div className="space-y-2 max-h-72 overflow-y-auto pr-2">
+                                            {actineEntries.map((e, i) => {
+                                                const dt = e.actionDate ? new Date(e.actionDate + 'T12:00:00').toLocaleDateString('pt-BR') : formatDate(e.createdAt);
+                                                return (
+                                                    <div key={e.id || i} className="border-b border-slate-50 pb-2 last:border-0">
+                                                        <div className="flex justify-between items-start gap-2">
+                                                            <div className="min-w-0 flex-1">
+                                                                <p className="text-[11px] font-black text-slate-800 uppercase truncate leading-tight">{String(e.doctorName || '-')}</p>
+                                                                <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                                                                    <span className="text-[8px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-bold">{String(e.crm || '-')}</span>
+                                                                    <span className="text-[8px] font-black uppercase text-amber-600">{String(e.category || '-')}</span>
+                                                                    <span className="text-[8px] font-bold text-slate-400 uppercase">📅 {dt}</span>
+                                                                </div>
+                                                                <p className="text-[10px] text-slate-500 font-bold uppercase truncate mt-0.5">{String(e.requesterName || '-')}</p>
+                                                                {e.observations && (
+                                                                    <p className="text-[9px] text-slate-400 italic mt-1 leading-snug overflow-hidden" style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+                                                                        Det: {String(e.observations)}
+                                                                    </p>
+                                                                )}
+                                                            </div>
+                                                            <span className="font-black text-amber-600 shrink-0 text-xs">R$ {String(e.value || '0,00')}</span>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                );
+                            })()}
 
                             <div className="grid grid-cols-1 gap-4">
                                 {feedStatsByAction.length > 0 && (
