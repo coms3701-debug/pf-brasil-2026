@@ -6,7 +6,7 @@ import { getFirestore, collection, addDoc, onSnapshot, doc, deleteDoc, updateDoc
 // =============================================================
 // CONTROLE DE VERSÃO DO APLICATIVO
 // =============================================================
-const APP_VERSION = '2.6.0';
+const APP_VERSION = '2.6.1';
 
 // =============================================================
 // CONFIGURAÇÃO DO BANCO DE DADOS (FIREBASE GOOGLE)
@@ -45,7 +45,7 @@ const REPRESENTATIVES = {
     "DIRETORIA (MATRIZ)": ["CARLOS OTAVIO"]
 };
 
-const ACTION_TYPES = ['DIAS DE PRODUTO', 'PRESENTE', 'REFEIÇÃO', 'CONGRESSOS', 'ORGANIZAÇÃO DE AMOSTRAS', 'MINI MEETING', 'EVENTOS', 'COMPRA DE ORIGINAIS', 'MATERIAL GRÁFICO'];
+const ACTION_TYPES = ['VERBA REVERSÃO ACTINE', 'DIAS DE PRODUTO', 'PRESENTE', 'REFEIÇÃO', 'CONGRESSOS', 'ORGANIZAÇÃO DE AMOSTRAS', 'MINI MEETING', 'EVENTOS', 'COMPRA DE ORIGINAIS', 'MATERIAL GRÁFICO'];
 const CATEGORIES = ['CAT 1', 'CAT 2', 'CAT 3', 'CAT 4', 'CAT5', 'OUTROS'];
 
 const ADMIN_USERS = {
