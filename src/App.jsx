@@ -6,7 +6,7 @@ import { getFirestore, collection, addDoc, onSnapshot, doc, deleteDoc, updateDoc
 // =============================================================
 // CONTROLE DE VERSÃO DO APLICATIVO
 // =============================================================
-const APP_VERSION = '2.6.3';
+const APP_VERSION = '2.6.4';
 
 // =============================================================
 // CONFIGURAÇÃO DO BANCO DE DADOS (FIREBASE GOOGLE)
@@ -1301,7 +1301,7 @@ export default function App() {
                             </div>
                         ) : (
                             <>
-                                {!currentAdmin && filteredFeedEntries.some(e => e.userId === user?.uid) && (
+                                {!currentAdmin && filteredFeedEntries.some(e => e.requesterName === formData.requesterName) && (
                                     <div className="bg-emerald-50 border border-emerald-100 p-3 rounded-2xl flex items-center justify-between shadow-sm">
                                         <div className="flex items-center gap-2">
                                             <div className="text-xl">👉</div>
@@ -1315,7 +1315,7 @@ export default function App() {
                                     </div>
                                 )}
                                 {filteredFeedEntries.map(e => {
-                                    if (!currentAdmin && e.userId === user?.uid) {
+                                    if (!currentAdmin && e.requesterName === formData.requesterName) {
                                         return (
                                             <SwipeableEntry
                                                 key={e.id}
