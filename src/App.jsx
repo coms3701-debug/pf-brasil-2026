@@ -6,7 +6,7 @@ import { getFirestore, collection, addDoc, onSnapshot, doc, deleteDoc, updateDoc
 // =============================================================
 // CONTROLE DE VERSÃO DO APLICATIVO
 // =============================================================
-const APP_VERSION = '2.6.2';
+const APP_VERSION = '2.6.3';
 
 // =============================================================
 // CONFIGURAÇÃO DO BANCO DE DADOS (FIREBASE GOOGLE)
@@ -1300,41 +1300,56 @@ export default function App() {
                                 </p>
                             </div>
                         ) : (
-                            filteredFeedEntries.map(e => {
-                                const formattedActionDate = e.actionDate ? new Date(e.actionDate + 'T12:00:00').toLocaleDateString('pt-BR') : '';
-                                return (
-                                    <div key={e.id} className="bg-white p-5 rounded-2xl shadow-md border border-slate-100 flex flex-col active:scale-[0.98] transition-all">
-                                        <div className="flex justify-between items-start">
-                                            <div className="min-w-0 pr-4 text-left">
-                                                <div className="flex items-center gap-2 mb-2 flex-wrap">
-                                                    <span className="text-[9px] font-black text-emerald-600 uppercase bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-100">{String(e.team || 'S/ Equipe')}</span>
-                                                    {formattedActionDate && (
-                                                        <span className="text-[9px] font-bold text-slate-500 uppercase bg-slate-100 px-2.5 py-1 rounded-full border border-slate-200">📅 {formattedActionDate}</span>
-                                                    )}
+                            <>
+                                {!currentAdmin && filteredFeedEntries.some(e => e.userId === user?.uid) && (
+                                    <div className="bg-emerald-50 border border-emerald-100 p-3 rounded-2xl flex items-center justify-between shadow-sm">
+                                        <div className="flex items-center gap-2">
+                                            <div className="text-xl">👉</div>
+                                            <p className="text-[9px] text-emerald-800 font-black uppercase tracking-wider leading-tight">Direita<br/><span className="text-emerald-600 font-medium">editar</span></p>
+                                        </div>
+                                        <div className="w-[1px] h-6 bg-emerald-200"></div>
+                                        <div className="flex items-center gap-2">
+                                            <p className="text-[9px] text-rose-800 font-black uppercase tracking-wider leading-tight text-right">Esquerda<br/><span className="text-rose-600 font-medium">excluir</span></p>
+                                            <div className="text-xl">👈</div>
+                                        </div>
+                                    </div>
+                                )}
+                                {filteredFeedEntries.map(e => {
+                                    if (!currentAdmin && e.userId === user?.uid) {
+                                        return (
+                                            <SwipeableEntry
+                                                key={e.id}
+                                                entry={e}
+                                                formatDate={formatDate}
+                                                onEdit={(entry) => setEditingEntry(entry)}
+                                                onDelete={(entry) => setDeleteTarget(entry)}
+                                            />
+                                        );
+                                    }
+                                    const formattedActionDate = e.actionDate ? new Date(e.actionDate + 'T12:00:00').toLocaleDateString('pt-BR') : '';
+                                    return (
+                                        <div key={e.id} className="bg-white p-5 rounded-2xl shadow-md border border-slate-100 flex flex-col active:scale-[0.98] transition-all">
+                                            <div className="flex justify-between items-start">
+                                                <div className="min-w-0 pr-4 text-left">
+                                                    <div className="flex items-center gap-2 mb-2 flex-wrap">
+                                                        <span className="text-[9px] font-black text-emerald-600 uppercase bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-100">{String(e.team || 'S/ Equipe')}</span>
+                                                        {formattedActionDate && (
+                                                            <span className="text-[9px] font-bold text-slate-500 uppercase bg-slate-100 px-2.5 py-1 rounded-full border border-slate-200">📅 {formattedActionDate}</span>
+                                                        )}
+                                                    </div>
+                                                    <h3 className="font-bold text-slate-800 text-sm truncate uppercase leading-tight">{String(e.doctorName || '')} <span className="text-slate-400 font-normal ml-1">({String(e.category || '')})</span></h3>
+                                                    <p className="text-[11px] text-slate-500 font-bold uppercase truncate opacity-70 mt-0.5">{String(e.requesterName || '')} • {String(e.actionType || '')}</p>
+                                                    {e.observations && <p className="text-[9px] text-slate-400 italic mt-1.5 truncate">Det: {e.observations}</p>}
                                                 </div>
-                                                <h3 className="font-bold text-slate-800 text-sm truncate uppercase leading-tight">{String(e.doctorName || '')} <span className="text-slate-400 font-normal ml-1">({String(e.category || '')})</span></h3>
-                                                <p className="text-[11px] text-slate-500 font-bold uppercase truncate opacity-70 mt-0.5">{String(e.requesterName || '')} • {String(e.actionType || '')}</p>
-                                                {e.observations && <p className="text-[9px] text-slate-400 italic mt-1.5 truncate">Det: {e.observations}</p>}
-                                            </div>
-                                            <div className="text-right shrink-0 flex flex-col items-end">
-                                                <p className="font-black text-slate-900 text-sm uppercase tracking-tighter">R$ {String(e.value || '0,00')}</p>
-                                                <p className="text-[10px] text-slate-400 font-bold mt-1">{formatDate(e.createdAt)}</p>
+                                                <div className="text-right shrink-0 flex flex-col items-end">
+                                                    <p className="font-black text-slate-900 text-sm uppercase tracking-tighter">R$ {String(e.value || '0,00')}</p>
+                                                    <p className="text-[10px] text-slate-400 font-bold mt-1">{formatDate(e.createdAt)}</p>
+                                                </div>
                                             </div>
                                         </div>
-
-                                        {!currentAdmin && e.userId === user?.uid && (
-                                            <div className="flex justify-end gap-2 mt-4 pt-3 border-t border-slate-50">
-                                                <button onClick={() => setEditingEntry(e)} className="bg-sky-50 text-sky-600 font-bold py-1.5 px-3 rounded-lg text-[10px] uppercase active:scale-90 transition-all border border-sky-100">
-                                                    Editar
-                                                </button>
-                                                <button onClick={() => setDeleteTarget(e)} className="bg-rose-50 text-rose-600 font-bold py-1.5 px-3 rounded-lg text-[10px] uppercase active:scale-90 transition-all border border-rose-100">
-                                                    Excluir
-                                                </button>
-                                            </div>
-                                        )}
-                                    </div>
-                                );
-                            })
+                                    );
+                                })}
+                            </>
                         )}
                     </div>
                 )}
