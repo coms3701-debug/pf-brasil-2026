@@ -6,7 +6,7 @@ import { getFirestore, collection, addDoc, onSnapshot, doc, deleteDoc, updateDoc
 // =============================================================
 // CONTROLE DE VERSÃO DO APLICATIVO
 // =============================================================
-const APP_VERSION = '2.6.5';
+const APP_VERSION = '2.7.0';
 
 // =============================================================
 // CONFIGURAÇÃO DO BANCO DE DADOS (FIREBASE GOOGLE)
@@ -62,6 +62,17 @@ const ADMIN_USERS = {
 const formatCRM = (val) => {
     let v = String(val || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
     return v.substring(0, 9);
+};
+
+// Retorna a lista de ações de um lançamento.
+// Lançamentos antigos guardam actionType como texto simples; os novos
+// (multi-seleção) guardam também o array actionTypes. O separador " + "
+// cobre registros multi-ação salvos apenas como texto.
+const getEntryActions = (entry) => {
+    if (Array.isArray(entry?.actionTypes) && entry.actionTypes.length > 0) return entry.actionTypes;
+    const s = String(entry?.actionType || '').trim();
+    if (!s) return [];
+    return s.includes(' + ') ? s.split(' + ').map(x => x.trim()).filter(Boolean) : [s];
 };
 
 const TouchSelect = ({ name, value, onChange, options, placeholder }) => {
@@ -471,7 +482,7 @@ export default function App() {
             t = localStorage.getItem('pf_user_team') || '';
             r = localStorage.getItem('pf_user_name') || '';
         } catch(e) {}
-        return { team: t, requesterName: r, actionDate: '', doctorName: '', crm: '', category: '', actionType: '', value: '', observations: '' };
+        return { team: t, requesterName: r, actionDate: '', doctorName: '', crm: '', category: '', actionType: '', actionTypes: [], value: '', observations: '' };
     });
 
     useEffect(() => {
@@ -611,8 +622,8 @@ export default function App() {
         [...new Set(feedEntries.map(e => String(e.requesterName || '')).filter(Boolean))].sort()
     , [feedEntries]);
 
-    const filterActionOptions = useMemo(() => 
-        [...new Set(feedEntries.map(e => String(e.actionType || '')).filter(Boolean))].sort()
+    const filterActionOptions = useMemo(() =>
+        [...new Set(feedEntries.flatMap(e => getEntryActions(e)))].sort()
     , [feedEntries]);
 
     // FEED FILTRADO (após filtros locais) - usado em TODOS os totais e listas
@@ -620,7 +631,7 @@ export default function App() {
         let result = feedEntries;
         if (filterDoctors.length > 0) result = result.filter(e => filterDoctors.includes(e.doctorName));
         if (filterReps.length > 0) result = result.filter(e => filterReps.includes(e.requesterName));
-        if (filterActionTypes.length > 0) result = result.filter(e => filterActionTypes.includes(e.actionType));
+        if (filterActionTypes.length > 0) result = result.filter(e => getEntryActions(e).some(a => filterActionTypes.includes(a)));
         return result;
     }, [feedEntries, filterDoctors, filterReps, filterActionTypes]);
 
@@ -686,11 +697,17 @@ export default function App() {
 
     const feedStatsByAction = useMemo(() => {
         try {
+            // Lançamentos multi-ação: valor dividido igualmente entre as ações,
+            // mantendo a soma do relatório igual ao total investido.
             const groups = filteredFeedEntries.reduce((acc, curr) => {
-                const type = String(curr.actionType || "NÃO DEFINIDA");
-                if (!acc[type]) acc[type] = { total: 0, count: 0 };
-                acc[type].total += parseCurrency(curr.value);
-                acc[type].count += 1;
+                const actions = getEntryActions(curr);
+                const list = actions.length > 0 ? actions : ["NÃO DEFINIDA"];
+                const share = parseCurrency(curr.value) / list.length;
+                list.forEach(type => {
+                    if (!acc[type]) acc[type] = { total: 0, count: 0 };
+                    acc[type].total += share;
+                    acc[type].count += 1;
+                });
                 return acc;
             }, {});
             return Object.entries(groups).map(([name, data]) => ({ name, ...data })).sort((a, b) => b.total - a.total);
@@ -790,13 +807,20 @@ export default function App() {
         e.preventDefault();
         if (!user) return alert("Aguarde a ligação ao servidor");
         
-        const { team, requesterName, actionDate, doctorName, value, observations, crm, category, actionType } = formData;
-        if (!team || !requesterName || !actionDate || !doctorName || !value || !crm || !category || !actionType) {
+        const { team, requesterName, actionDate, doctorName, value, crm, category } = formData;
+        const selectedActions = formData.actionTypes || [];
+        if (!team || !requesterName || !actionDate || !doctorName || !value || !crm || !category || selectedActions.length === 0) {
             return alert("Preencha todos os campos obrigatórios.");
         }
         try {
-            await addDoc(collection(db, COLLECTION_NAME), { ...formData, userId: user.uid, createdAt: new Date() });
-            setFormData({ ...formData, actionDate: '', doctorName: '', crm: '', value: '', observations: '', category: '', actionType: '' }); 
+            await addDoc(collection(db, COLLECTION_NAME), {
+                ...formData,
+                actionType: selectedActions.join(' + '),
+                actionTypes: selectedActions,
+                userId: user.uid,
+                createdAt: new Date()
+            });
+            setFormData({ ...formData, actionDate: '', doctorName: '', crm: '', value: '', observations: '', category: '', actionType: '', actionTypes: [] });
             
             if (navigator.vibrate) navigator.vibrate([30, 50, 30, 50, 30]); 
             setShowSuccessPopup(true);
@@ -807,13 +831,17 @@ export default function App() {
 
     const handleEditSubmit = async (e) => {
         e.preventDefault();
-        const { team, requesterName, actionDate, doctorName, value, crm, category, actionType } = editingEntry;
-        if (!team || !requesterName || !actionDate || !doctorName || !value || !crm || !category || !actionType) {
+        const { team, requesterName, actionDate, doctorName, value, crm, category } = editingEntry;
+        const editActions = getEntryActions(editingEntry);
+        if (!team || !requesterName || !actionDate || !doctorName || !value || !crm || !category || editActions.length === 0) {
             return notify("Preencha todos os campos obrigatórios.", "error");
         }
         try {
             await updateDoc(doc(db, COLLECTION_NAME, editingEntry.id), {
-                team, requesterName, actionDate, doctorName, value, crm, category, actionType, observations: editingEntry.observations || ''
+                team, requesterName, actionDate, doctorName, value, crm, category,
+                actionType: editActions.join(' + '),
+                actionTypes: editActions,
+                observations: editingEntry.observations || ''
             });
             setEditingEntry(null);
             if (navigator.vibrate) navigator.vibrate([30, 50, 30]); 
@@ -956,9 +984,15 @@ export default function App() {
 
                             <input name="doctorName" value={editingEntry.doctorName} onChange={e => setEditingEntry({...editingEntry, doctorName: e.target.value.toUpperCase()})} placeholder="NOME DO MÉDICO / DESTINATÁRIO" className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl font-bold text-sm outline-none focus:border-emerald-500 transition-all uppercase placeholder:text-slate-400" />
 
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-2 gap-4 items-end">
                                 <TouchSelect name="category" value={editingEntry.category} onChange={handleEditChange} options={CATEGORIES} placeholder="CATEGORIA" />
-                                <TouchSelect name="actionType" value={editingEntry.actionType} onChange={handleEditChange} options={ACTION_TYPES} placeholder="AÇÃO" />
+                                <MultiSelectSearch
+                                    values={getEntryActions(editingEntry)}
+                                    onChange={arr => setEditingEntry(prev => ({ ...prev, actionTypes: arr, actionType: arr.join(' + ') }))}
+                                    options={ACTION_TYPES}
+                                    placeholder="AÇÃO (1 OU MAIS)"
+                                    label="Tipo de Ação"
+                                />
                             </div>
 
                             <textarea name="observations" value={editingEntry.observations} onChange={handleEditChange} placeholder="DETALHE A AÇÃO AQUI..." rows="3" className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl text-sm font-medium outline-none focus:border-emerald-500 transition-all uppercase placeholder:text-slate-400" />
@@ -1057,9 +1091,15 @@ export default function App() {
 
                             <input name="doctorName" value={formData.doctorName} onChange={e => setFormData({...formData, doctorName: e.target.value.toUpperCase()})} placeholder="NOME DO MÉDICO / DESTINATÁRIO" className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl font-bold text-sm outline-none focus:border-emerald-500 transition-all uppercase placeholder:text-slate-400" />
 
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-2 gap-4 items-end">
                                 <TouchSelect name="category" value={formData.category} onChange={handleInputChange} options={CATEGORIES} placeholder="CATEGORIA..." />
-                                <TouchSelect name="actionType" value={formData.actionType} onChange={handleInputChange} options={ACTION_TYPES} placeholder="AÇÃO..." />
+                                <MultiSelectSearch
+                                    values={formData.actionTypes || []}
+                                    onChange={arr => setFormData(prev => ({ ...prev, actionTypes: arr, actionType: arr.join(' + ') }))}
+                                    options={ACTION_TYPES}
+                                    placeholder="AÇÃO (1 OU MAIS)..."
+                                    label="Tipo de Ação"
+                                />
                             </div>
 
                             <textarea name="observations" value={formData.observations} onChange={handleInputChange} placeholder="DETALHE A AÇÃO AQUI..." rows="3" className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl text-sm font-medium outline-none focus:border-emerald-500 transition-all uppercase placeholder:text-slate-400" />
@@ -1198,7 +1238,7 @@ export default function App() {
 
                             {(() => {
                                 const actineEntries = filteredFeedEntries
-                                    .filter(e => String(e.actionType || '').toUpperCase() === 'VERBA REVERSÃO ACTINE')
+                                    .filter(e => getEntryActions(e).some(a => String(a).toUpperCase() === 'VERBA REVERSÃO ACTINE'))
                                     .slice()
                                     .sort((a, b) => {
                                         const at = (a.createdAt && typeof a.createdAt.getTime === 'function') ? a.createdAt.getTime() : 0;
