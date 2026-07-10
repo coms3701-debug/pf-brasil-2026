@@ -6,7 +6,7 @@ import { getFirestore, collection, addDoc, onSnapshot, doc, deleteDoc, updateDoc
 // =============================================================
 // CONTROLE DE VERSÃO DO APLICATIVO
 // =============================================================
-const APP_VERSION = '2.7.0';
+const APP_VERSION = '2.8.0';
 
 // =============================================================
 // CONFIGURAÇÃO DO BANCO DE DADOS (FIREBASE GOOGLE)
@@ -45,7 +45,10 @@ const REPRESENTATIVES = {
     "DIRETORIA (MATRIZ)": ["CARLOS OTAVIO"]
 };
 
-const ACTION_TYPES = ['VERBA REVERSÃO ACTINE', 'DIAS DE PRODUTO', 'PRESENTE', 'REFEIÇÃO', 'CONGRESSOS', 'ORGANIZAÇÃO DE AMOSTRAS', 'MINI MEETING', 'EVENTOS', 'COMPRA DE ORIGINAIS', 'MATERIAL GRÁFICO'];
+const ACTION_TYPES = ['DIAS DE PRODUTO', 'PRESENTE', 'REFEIÇÃO', 'CONGRESSOS', 'ORGANIZAÇÃO DE AMOSTRAS', 'MINI MEETING', 'EVENTOS', 'COMPRA DE ORIGINAIS', 'MATERIAL GRÁFICO'];
+
+// CONTAS (FONTES DE VERBA)
+const BUDGET_SOURCES = ['REGIONAL', 'ACTINE'];
 const CATEGORIES = ['CAT 1', 'CAT 2', 'CAT 3', 'CAT 4', 'CAT5', 'OUTROS'];
 
 const ADMIN_USERS = {
@@ -73,6 +76,15 @@ const getEntryActions = (entry) => {
     const s = String(entry?.actionType || '').trim();
     if (!s) return [];
     return s.includes(' + ') ? s.split(' + ').map(x => x.trim()).filter(Boolean) : [s];
+};
+
+// Retorna a conta (fonte de verba) de um lançamento.
+// Novos lançamentos gravam budgetSource; os antigos que usavam a ação
+// "VERBA REVERSÃO ACTINE" são reconhecidos como conta ACTINE — sem migração.
+const getEntrySource = (entry) => {
+    if (entry?.budgetSource === 'ACTINE' || entry?.budgetSource === 'REGIONAL') return entry.budgetSource;
+    const isOldActine = getEntryActions(entry).some(a => String(a).toUpperCase() === 'VERBA REVERSÃO ACTINE');
+    return isOldActine ? 'ACTINE' : 'REGIONAL';
 };
 
 const TouchSelect = ({ name, value, onChange, options, placeholder }) => {
@@ -360,6 +372,9 @@ const SwipeableEntry = ({ entry, onEdit, onDelete, formatDate }) => {
                 <div className="min-w-0 pr-4 text-left">
                     <div className="flex items-center gap-2 mb-2 flex-wrap">
                         <span className="text-[9px] font-black text-emerald-600 uppercase bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-100">{String(entry.team || 'S/ Equipe')}</span>
+                        {getEntrySource(entry) === 'ACTINE' && (
+                            <span className="text-[9px] font-black text-amber-600 uppercase bg-amber-50 px-2.5 py-1 rounded-full border border-amber-200">🧴 ACTINE</span>
+                        )}
                         {formattedActionDate && (
                             <span className="text-[9px] font-bold text-slate-500 uppercase bg-slate-100 px-2.5 py-1 rounded-full border border-slate-200">📅 {formattedActionDate}</span>
                         )}
@@ -407,6 +422,7 @@ export default function App() {
     const [filterDoctors, setFilterDoctors] = useState([]);
     const [filterReps, setFilterReps] = useState([]);
     const [filterActionTypes, setFilterActionTypes] = useState([]);
+    const [filterSource, setFilterSource] = useState('TODAS');
 
     useEffect(() => {
         fetch('/medicos.json?v=' + new Date().getTime(), { cache: 'no-store' })
@@ -465,7 +481,12 @@ export default function App() {
     }, []);
 
     const [teamBudgets, setTeamBudgets] = useState(() => {
-        try { return JSON.parse(localStorage.getItem('pf_team_budgets')) || {}; } 
+        try { return JSON.parse(localStorage.getItem('pf_team_budgets')) || {}; }
+        catch (e) { return {}; }
+    });
+
+    const [teamBudgetsActine, setTeamBudgetsActine] = useState(() => {
+        try { return JSON.parse(localStorage.getItem('pf_team_budgets_actine')) || {}; }
         catch (e) { return {}; }
     });
 
@@ -476,13 +497,20 @@ export default function App() {
         try { localStorage.setItem('pf_team_budgets', JSON.stringify(newBudgets)); } catch(e) {}
     };
 
+    const handleBudgetChangeActine = (val) => {
+        if (!currentFeedTeam || currentFeedTeam === 'ALL') return;
+        const newBudgets = { ...teamBudgetsActine, [currentFeedTeam]: val };
+        setTeamBudgetsActine(newBudgets);
+        try { localStorage.setItem('pf_team_budgets_actine', JSON.stringify(newBudgets)); } catch(e) {}
+    };
+
     const [formData, setFormData] = useState(() => {
         let t = '', r = '';
         try {
             t = localStorage.getItem('pf_user_team') || '';
             r = localStorage.getItem('pf_user_name') || '';
         } catch(e) {}
-        return { team: t, requesterName: r, actionDate: '', doctorName: '', crm: '', category: '', actionType: '', actionTypes: [], value: '', observations: '' };
+        return { team: t, requesterName: r, actionDate: '', doctorName: '', crm: '', category: '', actionType: '', actionTypes: [], budgetSource: 'REGIONAL', value: '', observations: '' };
     });
 
     useEffect(() => {
@@ -604,6 +632,16 @@ export default function App() {
         } catch(e) { return ''; }
     }, [currentFeedTeam, teamBudgets, parseCurrency]);
 
+    const displayBudgetCeilingActine = useMemo(() => {
+        try {
+            if (currentFeedTeam === 'ALL') {
+                const total = TEAMS.reduce((acc, team) => acc + parseCurrency(teamBudgetsActine[team] || "0"), 0);
+                return total > 0 ? total.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '';
+            }
+            return teamBudgetsActine[currentFeedTeam] || '';
+        } catch(e) { return ''; }
+    }, [currentFeedTeam, teamBudgetsActine, parseCurrency]);
+
     // BASE DO FEED (sem filtros locais)
     const feedEntries = useMemo(() => {
         try {
@@ -632,39 +670,57 @@ export default function App() {
         if (filterDoctors.length > 0) result = result.filter(e => filterDoctors.includes(e.doctorName));
         if (filterReps.length > 0) result = result.filter(e => filterReps.includes(e.requesterName));
         if (filterActionTypes.length > 0) result = result.filter(e => getEntryActions(e).some(a => filterActionTypes.includes(a)));
+        if (filterSource !== 'TODAS') result = result.filter(e => getEntrySource(e) === filterSource);
         return result;
-    }, [feedEntries, filterDoctors, filterReps, filterActionTypes]);
+    }, [feedEntries, filterDoctors, filterReps, filterActionTypes, filterSource]);
 
-    const activeFilterCount = filterDoctors.length + filterReps.length + filterActionTypes.length;
+    const activeFilterCount = filterDoctors.length + filterReps.length + filterActionTypes.length + (filterSource !== 'TODAS' ? 1 : 0);
 
     const clearFilters = () => {
         setFilterDoctors([]);
         setFilterReps([]);
         setFilterActionTypes([]);
+        setFilterSource('TODAS');
     };
 
     // TOTAIS RELACIONADOS AO FEED FILTRADO
     const totalUsedFeed = useMemo(() => {
-        try { return filteredFeedEntries.reduce((acc, curr) => acc + parseCurrency(curr.value), 0); } 
+        try { return filteredFeedEntries.reduce((acc, curr) => acc + parseCurrency(curr.value), 0); }
         catch(e) { return 0; }
     }, [filteredFeedEntries, parseCurrency]);
-    
-    const budgetBalance = useMemo(() => {
-        try { return parseCurrency(displayBudgetCeiling) - totalUsedFeed; } 
+
+    // TOTAIS POR CONTA (Regional × Actine)
+    const totalUsedRegional = useMemo(() => {
+        try { return filteredFeedEntries.filter(e => getEntrySource(e) === 'REGIONAL').reduce((acc, curr) => acc + parseCurrency(curr.value), 0); }
         catch(e) { return 0; }
-    }, [displayBudgetCeiling, totalUsedFeed]);
+    }, [filteredFeedEntries, parseCurrency]);
+
+    const totalUsedActine = useMemo(() => {
+        try { return filteredFeedEntries.filter(e => getEntrySource(e) === 'ACTINE').reduce((acc, curr) => acc + parseCurrency(curr.value), 0); }
+        catch(e) { return 0; }
+    }, [filteredFeedEntries, parseCurrency]);
+
+    const budgetBalance = useMemo(() => {
+        try { return parseCurrency(displayBudgetCeiling) - totalUsedRegional; }
+        catch(e) { return 0; }
+    }, [displayBudgetCeiling, totalUsedRegional]);
+
+    const budgetBalanceActine = useMemo(() => {
+        try { return parseCurrency(displayBudgetCeilingActine) - totalUsedActine; }
+        catch(e) { return 0; }
+    }, [displayBudgetCeilingActine, totalUsedActine]);
 
     const exportToCSV = () => {
         try {
             const dataToExport = currentAdmin ? filteredFeedEntries : filteredFeedEntries;
             if (dataToExport.length === 0) return notify("Não existem dados para exportar.", "error");
 
-            const headers = ["Data Insercao", "Data da Acao", "Estrutura", "Solicitante", "Medico/Destinatario", "CRM", "Categoria", "Acao", "Valor", "Observacoes"];
+            const headers = ["Data Insercao", "Data da Acao", "Estrutura", "Solicitante", "Medico/Destinatario", "CRM", "Categoria", "Conta", "Acao", "Valor", "Observacoes"];
             const rows = dataToExport.map(e => {
                 const dateIns = formatDate(e.createdAt);
                 const actionDateExport = e.actionDate ? new Date(e.actionDate + 'T12:00:00').toLocaleDateString('pt-BR') : '';
-                const obs = String(e.observations || "").replace(/"/g, '""').replace(/\n/g, ' '); 
-                return [`"${dateIns}"`,`"${actionDateExport}"`,`"${e.team || ''}"`,`"${e.requesterName || ''}"`,`"${e.doctorName || ''}"`,`"${e.crm || ''}"`,`"${e.category || ''}"`,`"${e.actionType || ''}"`,`"${e.value || ''}"`,`"${obs}"`].join(";");
+                const obs = String(e.observations || "").replace(/"/g, '""').replace(/\n/g, ' ');
+                return [`"${dateIns}"`,`"${actionDateExport}"`,`"${e.team || ''}"`,`"${e.requesterName || ''}"`,`"${e.doctorName || ''}"`,`"${e.crm || ''}"`,`"${e.category || ''}"`,`"VERBA ${getEntrySource(e)}"`,`"${e.actionType || ''}"`,`"${e.value || ''}"`,`"${obs}"`].join(";");
             });
 
             const csvString = [headers.join(";"), ...rows].join("\n");
@@ -817,10 +873,11 @@ export default function App() {
                 ...formData,
                 actionType: selectedActions.join(' + '),
                 actionTypes: selectedActions,
+                budgetSource: formData.budgetSource || 'REGIONAL',
                 userId: user.uid,
                 createdAt: new Date()
             });
-            setFormData({ ...formData, actionDate: '', doctorName: '', crm: '', value: '', observations: '', category: '', actionType: '', actionTypes: [] });
+            setFormData({ ...formData, actionDate: '', doctorName: '', crm: '', value: '', observations: '', category: '', actionType: '', actionTypes: [], budgetSource: 'REGIONAL' });
             
             if (navigator.vibrate) navigator.vibrate([30, 50, 30, 50, 30]); 
             setShowSuccessPopup(true);
@@ -841,6 +898,7 @@ export default function App() {
                 team, requesterName, actionDate, doctorName, value, crm, category,
                 actionType: editActions.join(' + '),
                 actionTypes: editActions,
+                budgetSource: getEntrySource(editingEntry),
                 observations: editingEntry.observations || ''
             });
             setEditingEntry(null);
@@ -962,13 +1020,31 @@ export default function App() {
 
                             <div className="space-y-1.5">
                                 <label className="text-xs font-bold text-slate-500 ml-1 uppercase tracking-widest italic">Data da Ação</label>
-                                <input 
-                                    type="date" 
-                                    name="actionDate" 
-                                    value={editingEntry.actionDate || ''} 
-                                    onChange={handleEditChange} 
-                                    className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl font-bold text-sm outline-none focus:border-emerald-500 transition-all uppercase text-slate-600" 
+                                <input
+                                    type="date"
+                                    name="actionDate"
+                                    value={editingEntry.actionDate || ''}
+                                    onChange={handleEditChange}
+                                    className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl font-bold text-sm outline-none focus:border-emerald-500 transition-all uppercase text-slate-600"
                                 />
+                            </div>
+
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-bold text-slate-500 ml-1 uppercase tracking-widest italic">Conta (Fonte da Verba)</label>
+                                <div className="flex bg-slate-100 p-1.5 rounded-2xl shadow-inner">
+                                    {BUDGET_SOURCES.map(src => (
+                                        <button
+                                            key={src}
+                                            type="button"
+                                            onClick={() => setEditingEntry(prev => ({ ...prev, budgetSource: src }))}
+                                            className={`flex-1 py-3 text-xs font-black uppercase rounded-xl transition-all ${getEntrySource(editingEntry) === src
+                                                ? (src === 'ACTINE' ? 'bg-amber-500 text-white shadow-lg' : 'bg-emerald-600 text-white shadow-lg')
+                                                : 'text-slate-500'}`}
+                                        >
+                                            {src === 'REGIONAL' ? '💼 REGIONAL' : '🧴 ACTINE'}
+                                        </button>
+                                    ))}
+                                </div>
                             </div>
 
                             <div className="grid grid-cols-2 gap-4">
@@ -1062,13 +1138,31 @@ export default function App() {
 
                             <div className="space-y-1.5">
                                 <label className="text-xs font-bold text-slate-500 ml-1 uppercase tracking-widest italic">Data da Ação</label>
-                                <input 
-                                    type="date" 
-                                    name="actionDate" 
-                                    value={formData.actionDate} 
-                                    onChange={handleInputChange} 
-                                    className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl font-bold text-sm outline-none focus:border-emerald-500 transition-all uppercase text-slate-600" 
+                                <input
+                                    type="date"
+                                    name="actionDate"
+                                    value={formData.actionDate}
+                                    onChange={handleInputChange}
+                                    className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl font-bold text-sm outline-none focus:border-emerald-500 transition-all uppercase text-slate-600"
                                 />
+                            </div>
+
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-bold text-slate-500 ml-1 uppercase tracking-widest italic">Conta (Fonte da Verba)</label>
+                                <div className="flex bg-slate-100 p-1.5 rounded-2xl shadow-inner">
+                                    {BUDGET_SOURCES.map(src => (
+                                        <button
+                                            key={src}
+                                            type="button"
+                                            onClick={() => setFormData(prev => ({ ...prev, budgetSource: src }))}
+                                            className={`flex-1 py-3 text-xs font-black uppercase rounded-xl transition-all ${(formData.budgetSource || 'REGIONAL') === src
+                                                ? (src === 'ACTINE' ? 'bg-amber-500 text-white shadow-lg' : 'bg-emerald-600 text-white shadow-lg')
+                                                : 'text-slate-500'}`}
+                                        >
+                                            {src === 'REGIONAL' ? '💼 REGIONAL' : '🧴 ACTINE'}
+                                        </button>
+                                    ))}
+                                </div>
                             </div>
 
                             <div className="grid grid-cols-2 gap-4">
@@ -1144,24 +1238,57 @@ export default function App() {
                                     <h4 className="text-2xl font-black text-slate-300">{filteredFeedEntries.length}</h4>
                                 </div>
                             </div>
-                            <div className="grid grid-cols-2 gap-5 relative z-10">
-                                <div className="space-y-1.5">
-                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
-                                        {isAllTeams ? "Teto do Brasil" : "Teto da Distrital"}
-                                    </label>
-                                    <input 
-                                        value={displayBudgetCeiling} 
-                                        onChange={e => handleBudgetChange(formatValueInput(e.target.value))} 
-                                        placeholder={isAllTeams ? "SOMA AUTOMÁTICA" : "R$ 0,00"} 
-                                        disabled={inputDisabled}
-                                        className={`w-full bg-slate-800/80 border border-slate-700 rounded-xl p-3 text-sm font-black text-emerald-100 focus:ring-2 focus:ring-emerald-500 uppercase text-center transition-all ${inputDisabled ? 'opacity-60 cursor-not-allowed' : ''}`} 
-                                    />
+                            <div className="space-y-3 relative z-10">
+                                {/* CONTA REGIONAL */}
+                                <div className="bg-slate-800/50 rounded-2xl p-4 border border-slate-700/50">
+                                    <div className="flex items-center justify-between mb-2.5">
+                                        <p className="text-[10px] font-black text-emerald-400 uppercase tracking-[0.2em]">💼 Verba Regional</p>
+                                        <p className="text-xs font-black text-slate-300">R$ {Number(totalUsedRegional).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4 items-end">
+                                        <div className="space-y-1">
+                                            <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest">{isAllTeams ? "Teto Brasil" : "Teto"}</label>
+                                            <input
+                                                value={displayBudgetCeiling}
+                                                onChange={e => handleBudgetChange(formatValueInput(e.target.value))}
+                                                placeholder={isAllTeams ? "SOMA AUTO" : "R$ 0,00"}
+                                                disabled={inputDisabled}
+                                                className={`w-full bg-slate-800/80 border border-slate-700 rounded-xl p-2.5 text-xs font-black text-emerald-100 focus:ring-2 focus:ring-emerald-500 uppercase text-center transition-all ${inputDisabled ? 'opacity-60 cursor-not-allowed' : ''}`}
+                                            />
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-0.5">Saldo Livre</p>
+                                            <h4 className={`text-base font-black ${budgetBalance < 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
+                                                R$ {Number(budgetBalance).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                            </h4>
+                                        </div>
+                                    </div>
                                 </div>
-                                <div className="text-right flex flex-col justify-end">
-                                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Saldo Livre</p>
-                                    <h4 className={`text-lg font-black ${budgetBalance < 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
-                                        R$ {Number(budgetBalance).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                                    </h4>
+
+                                {/* CONTA ACTINE */}
+                                <div className="bg-slate-800/50 rounded-2xl p-4 border border-amber-500/20">
+                                    <div className="flex items-center justify-between mb-2.5">
+                                        <p className="text-[10px] font-black text-amber-400 uppercase tracking-[0.2em]">🧴 Verba Actine</p>
+                                        <p className="text-xs font-black text-slate-300">R$ {Number(totalUsedActine).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4 items-end">
+                                        <div className="space-y-1">
+                                            <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest">{isAllTeams ? "Teto Brasil" : "Teto"}</label>
+                                            <input
+                                                value={displayBudgetCeilingActine}
+                                                onChange={e => handleBudgetChangeActine(formatValueInput(e.target.value))}
+                                                placeholder={isAllTeams ? "SOMA AUTO" : "R$ 0,00"}
+                                                disabled={inputDisabled}
+                                                className={`w-full bg-slate-800/80 border border-slate-700 rounded-xl p-2.5 text-xs font-black text-amber-100 focus:ring-2 focus:ring-amber-500 uppercase text-center transition-all ${inputDisabled ? 'opacity-60 cursor-not-allowed' : ''}`}
+                                            />
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-0.5">Saldo Livre</p>
+                                            <h4 className={`text-base font-black ${budgetBalanceActine < 0 ? 'text-rose-400' : 'text-amber-400'}`}>
+                                                R$ {Number(budgetBalanceActine).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                            </h4>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -1196,6 +1323,23 @@ export default function App() {
 
                             {filtersOpen && (
                                 <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 space-y-3 animate-in slide-in-from-top-2 duration-200">
+                                    <div className="space-y-1">
+                                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1 block">Conta</label>
+                                        <div className="flex bg-slate-100 p-1 rounded-xl">
+                                            {['TODAS', ...BUDGET_SOURCES].map(src => (
+                                                <button
+                                                    key={src}
+                                                    type="button"
+                                                    onClick={() => setFilterSource(src)}
+                                                    className={`flex-1 py-2 text-[10px] font-black uppercase rounded-lg transition-all ${filterSource === src
+                                                        ? (src === 'ACTINE' ? 'bg-amber-500 text-white shadow' : src === 'REGIONAL' ? 'bg-emerald-600 text-white shadow' : 'bg-slate-900 text-white shadow')
+                                                        : 'text-slate-500'}`}
+                                                >
+                                                    {src}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
                                     <MultiSelectSearch
                                         values={filterDoctors}
                                         onChange={setFilterDoctors}
@@ -1238,7 +1382,7 @@ export default function App() {
 
                             {(() => {
                                 const actineEntries = filteredFeedEntries
-                                    .filter(e => getEntryActions(e).some(a => String(a).toUpperCase() === 'VERBA REVERSÃO ACTINE'))
+                                    .filter(e => getEntrySource(e) === 'ACTINE')
                                     .slice()
                                     .sort((a, b) => {
                                         const at = (a.createdAt && typeof a.createdAt.getTime === 'function') ? a.createdAt.getTime() : 0;
@@ -1250,7 +1394,7 @@ export default function App() {
                                 return (
                                     <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
                                         <div className="flex justify-between items-center mb-3 border-l-2 border-amber-500 pl-2">
-                                            <h3 className="text-[10px] font-black text-slate-800 uppercase tracking-widest">Ações Actine</h3>
+                                            <h3 className="text-[10px] font-black text-slate-800 uppercase tracking-widest">🧴 Extrato Verba Actine</h3>
                                             <span className="text-[10px] font-black text-amber-600">R$ {Number(actineTotal).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} • {actineEntries.length}</span>
                                         </div>
                                         <div className="space-y-2 max-h-72 overflow-y-auto pr-2">
@@ -1266,7 +1410,7 @@ export default function App() {
                                                                     <span className="text-[8px] font-black uppercase text-amber-600">{String(e.category || '-')}</span>
                                                                     <span className="text-[8px] font-bold text-slate-400 uppercase">📅 {dt}</span>
                                                                 </div>
-                                                                <p className="text-[10px] text-slate-500 font-bold uppercase truncate mt-0.5">{String(e.requesterName || '-')}</p>
+                                                                <p className="text-[10px] text-slate-500 font-bold uppercase truncate mt-0.5">{String(e.requesterName || '-')} • {String(e.actionType || '-')}</p>
                                                                 {e.observations && (
                                                                     <p className="text-[9px] text-slate-400 italic mt-1 leading-snug overflow-hidden" style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
                                                                         Det: {String(e.observations)}
@@ -1373,6 +1517,9 @@ export default function App() {
                                                 <div className="min-w-0 pr-4 text-left">
                                                     <div className="flex items-center gap-2 mb-2 flex-wrap">
                                                         <span className="text-[9px] font-black text-emerald-600 uppercase bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-100">{String(e.team || 'S/ Equipe')}</span>
+                                                        {getEntrySource(e) === 'ACTINE' && (
+                                                            <span className="text-[9px] font-black text-amber-600 uppercase bg-amber-50 px-2.5 py-1 rounded-full border border-amber-200">🧴 ACTINE</span>
+                                                        )}
                                                         {formattedActionDate && (
                                                             <span className="text-[9px] font-bold text-slate-500 uppercase bg-slate-100 px-2.5 py-1 rounded-full border border-slate-200">📅 {formattedActionDate}</span>
                                                         )}
