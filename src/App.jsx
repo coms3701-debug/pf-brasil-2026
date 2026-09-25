@@ -6,7 +6,7 @@ import { getFirestore, collection, addDoc, onSnapshot, doc, deleteDoc, updateDoc
 // =============================================================
 // CONTROLE DE VERSÃO DO APLICATIVO
 // =============================================================
-const APP_VERSION = '2.8.1';
+const APP_VERSION = '2.9.0';
 
 // =============================================================
 // CONFIGURAÇÃO DO BANCO DE DADOS (FIREBASE GOOGLE)
@@ -48,7 +48,12 @@ const REPRESENTATIVES = {
 const ACTION_TYPES = ['DIAS DE PRODUTO', 'PRESENTE', 'REFEIÇÃO', 'CONGRESSOS', 'ORGANIZAÇÃO DE AMOSTRAS', 'MINI MEETING', 'EVENTOS', 'COMPRA DE ORIGINAIS', 'MATERIAL GRÁFICO'];
 
 // CONTAS (FONTES DE VERBA)
-const BUDGET_SOURCES = ['REGIONAL', 'ACTINE'];
+const BUDGET_SOURCES = ['REGIONAL', 'ACTINE', 'MKT'];
+
+// Identidade visual de cada conta (rótulo no botão, cor ativa e selo do card)
+const SOURCE_LABELS = { REGIONAL: '💼 REGIONAL', ACTINE: '🧴 ACTINE', MKT: '📣 MKT' };
+const SOURCE_BTN = { REGIONAL: 'bg-emerald-600 text-white shadow-lg', ACTINE: 'bg-amber-500 text-white shadow-lg', MKT: 'bg-violet-500 text-white shadow-lg' };
+const SOURCE_CHIP = { ACTINE: 'text-amber-600 bg-amber-50 border-amber-200', MKT: 'text-violet-600 bg-violet-50 border-violet-200' };
 const CATEGORIES = ['CAT 1', 'CAT 2', 'CAT 3', 'CAT 4', 'CAT5', 'OUTROS'];
 
 const ADMIN_USERS = {
@@ -82,7 +87,7 @@ const getEntryActions = (entry) => {
 // Novos lançamentos gravam budgetSource; os antigos que usavam a ação
 // "VERBA REVERSÃO ACTINE" são reconhecidos como conta ACTINE — sem migração.
 const getEntrySource = (entry) => {
-    if (entry?.budgetSource === 'ACTINE' || entry?.budgetSource === 'REGIONAL') return entry.budgetSource;
+    if (BUDGET_SOURCES.includes(entry?.budgetSource)) return entry.budgetSource;
     const isOldActine = getEntryActions(entry).some(a => String(a).toUpperCase() === 'VERBA REVERSÃO ACTINE');
     return isOldActine ? 'ACTINE' : 'REGIONAL';
 };
@@ -372,8 +377,8 @@ const SwipeableEntry = ({ entry, onEdit, onDelete, formatDate }) => {
                 <div className="min-w-0 pr-4 text-left">
                     <div className="flex items-center gap-2 mb-2 flex-wrap">
                         <span className="text-[9px] font-black text-emerald-600 uppercase bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-100">{String(entry.team || 'S/ Equipe')}</span>
-                        {getEntrySource(entry) === 'ACTINE' && (
-                            <span className="text-[9px] font-black text-amber-600 uppercase bg-amber-50 px-2.5 py-1 rounded-full border border-amber-200">🧴 ACTINE</span>
+                        {getEntrySource(entry) !== 'REGIONAL' && (
+                            <span className={`text-[9px] font-black uppercase px-2.5 py-1 rounded-full border ${SOURCE_CHIP[getEntrySource(entry)]}`}>{SOURCE_LABELS[getEntrySource(entry)]}</span>
                         )}
                         {formattedActionDate && (
                             <span className="text-[9px] font-bold text-slate-500 uppercase bg-slate-100 px-2.5 py-1 rounded-full border border-slate-200">📅 {formattedActionDate}</span>
@@ -490,6 +495,11 @@ export default function App() {
         catch (e) { return {}; }
     });
 
+    const [teamBudgetsMkt, setTeamBudgetsMkt] = useState(() => {
+        try { return JSON.parse(localStorage.getItem('pf_team_budgets_mkt')) || {}; }
+        catch (e) { return {}; }
+    });
+
     const handleBudgetChange = (val) => {
         if (!currentFeedTeam || currentFeedTeam === 'ALL') return;
         const newBudgets = { ...teamBudgets, [currentFeedTeam]: val };
@@ -502,6 +512,13 @@ export default function App() {
         const newBudgets = { ...teamBudgetsActine, [currentFeedTeam]: val };
         setTeamBudgetsActine(newBudgets);
         try { localStorage.setItem('pf_team_budgets_actine', JSON.stringify(newBudgets)); } catch(e) {}
+    };
+
+    const handleBudgetChangeMkt = (val) => {
+        if (!currentFeedTeam || currentFeedTeam === 'ALL') return;
+        const newBudgets = { ...teamBudgetsMkt, [currentFeedTeam]: val };
+        setTeamBudgetsMkt(newBudgets);
+        try { localStorage.setItem('pf_team_budgets_mkt', JSON.stringify(newBudgets)); } catch(e) {}
     };
 
     const [formData, setFormData] = useState(() => {
@@ -642,6 +659,16 @@ export default function App() {
         } catch(e) { return ''; }
     }, [currentFeedTeam, teamBudgetsActine, parseCurrency]);
 
+    const displayBudgetCeilingMkt = useMemo(() => {
+        try {
+            if (currentFeedTeam === 'ALL') {
+                const total = TEAMS.reduce((acc, team) => acc + parseCurrency(teamBudgetsMkt[team] || "0"), 0);
+                return total > 0 ? total.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '';
+            }
+            return teamBudgetsMkt[currentFeedTeam] || '';
+        } catch(e) { return ''; }
+    }, [currentFeedTeam, teamBudgetsMkt, parseCurrency]);
+
     // BASE DO FEED (sem filtros locais)
     const feedEntries = useMemo(() => {
         try {
@@ -700,6 +727,11 @@ export default function App() {
         catch(e) { return 0; }
     }, [filteredFeedEntries, parseCurrency]);
 
+    const totalUsedMkt = useMemo(() => {
+        try { return filteredFeedEntries.filter(e => getEntrySource(e) === 'MKT').reduce((acc, curr) => acc + parseCurrency(curr.value), 0); }
+        catch(e) { return 0; }
+    }, [filteredFeedEntries, parseCurrency]);
+
     const budgetBalance = useMemo(() => {
         try { return parseCurrency(displayBudgetCeiling) - totalUsedRegional; }
         catch(e) { return 0; }
@@ -709,6 +741,11 @@ export default function App() {
         try { return parseCurrency(displayBudgetCeilingActine) - totalUsedActine; }
         catch(e) { return 0; }
     }, [displayBudgetCeilingActine, totalUsedActine]);
+
+    const budgetBalanceMkt = useMemo(() => {
+        try { return parseCurrency(displayBudgetCeilingMkt) - totalUsedMkt; }
+        catch(e) { return 0; }
+    }, [displayBudgetCeilingMkt, totalUsedMkt]);
 
     const exportToCSV = () => {
         try {
@@ -956,6 +993,54 @@ export default function App() {
 
     const numMedicosCarregados = Object.keys(doctorsDatabase).length;
 
+    // Extrato de uma conta (Actine, MKT): mesma estrutura para todas.
+    const renderSourceStatement = (source, title, borderClass, textClass) => {
+        const list = filteredFeedEntries
+            .filter(e => getEntrySource(e) === source)
+            .slice()
+            .sort((a, b) => {
+                const at = (a.createdAt && typeof a.createdAt.getTime === 'function') ? a.createdAt.getTime() : 0;
+                const bt = (b.createdAt && typeof b.createdAt.getTime === 'function') ? b.createdAt.getTime() : 0;
+                return bt - at;
+            });
+        if (list.length === 0) return null;
+        const total = list.reduce((acc, curr) => acc + parseCurrency(curr.value), 0);
+        return (
+            <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
+                <div className={`flex justify-between items-center mb-3 border-l-2 pl-2 ${borderClass}`}>
+                    <h3 className="text-[10px] font-black text-slate-800 uppercase tracking-widest">{title}</h3>
+                    <span className={`text-[10px] font-black ${textClass}`}>R$ {Number(total).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} • {list.length}</span>
+                </div>
+                <div className="space-y-2 max-h-72 overflow-y-auto pr-2">
+                    {list.map((e, i) => {
+                        const dt = e.actionDate ? new Date(e.actionDate + 'T12:00:00').toLocaleDateString('pt-BR') : formatDate(e.createdAt);
+                        return (
+                            <div key={e.id || i} className="border-b border-slate-50 pb-2 last:border-0">
+                                <div className="flex justify-between items-start gap-2">
+                                    <div className="min-w-0 flex-1">
+                                        <p className="text-[11px] font-black text-slate-800 uppercase truncate leading-tight">{String(e.doctorName || '-')}</p>
+                                        <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                                            <span className="text-[8px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-bold">{String(e.crm || '-')}</span>
+                                            <span className={`text-[8px] font-black uppercase ${textClass}`}>{String(e.category || '-')}</span>
+                                            <span className="text-[8px] font-bold text-slate-400 uppercase">📅 {dt}</span>
+                                        </div>
+                                        <p className="text-[10px] text-slate-500 font-bold uppercase truncate mt-0.5">{String(e.requesterName || '-')} • {String(e.actionType || '-')}</p>
+                                        {e.observations && (
+                                            <p className="text-[9px] text-slate-400 italic mt-1 leading-snug overflow-hidden" style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+                                                Det: {String(e.observations)}
+                                            </p>
+                                        )}
+                                    </div>
+                                    <span className={`font-black shrink-0 text-xs ${textClass}`}>R$ {String(e.value || '0,00')}</span>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            </div>
+        );
+    };
+
     return (
         <div className="min-h-screen bg-slate-100 pb-24 text-slate-900 font-sans">
             
@@ -1037,11 +1122,9 @@ export default function App() {
                                             key={src}
                                             type="button"
                                             onClick={() => setEditingEntry(prev => ({ ...prev, budgetSource: src }))}
-                                            className={`flex-1 py-3 text-xs font-black uppercase rounded-xl transition-all ${getEntrySource(editingEntry) === src
-                                                ? (src === 'ACTINE' ? 'bg-amber-500 text-white shadow-lg' : 'bg-emerald-600 text-white shadow-lg')
-                                                : 'text-slate-500'}`}
+                                            className={`flex-1 py-3 px-1 text-[10px] font-black uppercase rounded-xl transition-all ${getEntrySource(editingEntry) === src ? SOURCE_BTN[src] : 'text-slate-500'}`}
                                         >
-                                            {src === 'REGIONAL' ? '💼 REGIONAL' : '🧴 ACTINE'}
+                                            {SOURCE_LABELS[src]}
                                         </button>
                                     ))}
                                 </div>
@@ -1155,11 +1238,9 @@ export default function App() {
                                             key={src}
                                             type="button"
                                             onClick={() => setFormData(prev => ({ ...prev, budgetSource: src }))}
-                                            className={`flex-1 py-3 text-xs font-black uppercase rounded-xl transition-all ${(formData.budgetSource || 'REGIONAL') === src
-                                                ? (src === 'ACTINE' ? 'bg-amber-500 text-white shadow-lg' : 'bg-emerald-600 text-white shadow-lg')
-                                                : 'text-slate-500'}`}
+                                            className={`flex-1 py-3 px-1 text-[10px] font-black uppercase rounded-xl transition-all ${(formData.budgetSource || 'REGIONAL') === src ? SOURCE_BTN[src] : 'text-slate-500'}`}
                                         >
-                                            {src === 'REGIONAL' ? '💼 REGIONAL' : '🧴 ACTINE'}
+                                            {SOURCE_LABELS[src]}
                                         </button>
                                     ))}
                                 </div>
@@ -1290,6 +1371,32 @@ export default function App() {
                                         </div>
                                     </div>
                                 </div>
+
+                                {/* CONTA MKT */}
+                                <div className="bg-slate-800/50 rounded-2xl p-4 border border-violet-500/20">
+                                    <div className="flex items-center justify-between mb-2.5">
+                                        <p className="text-[10px] font-black text-violet-400 uppercase tracking-[0.2em]">📣 Verba MKT</p>
+                                        <p className="text-xs font-black text-slate-300">R$ {Number(totalUsedMkt).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4 items-end">
+                                        <div className="space-y-1">
+                                            <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest">{isAllTeams ? "Teto Brasil" : "Teto"}</label>
+                                            <input
+                                                value={displayBudgetCeilingMkt}
+                                                onChange={e => handleBudgetChangeMkt(formatValueInput(e.target.value))}
+                                                placeholder={isAllTeams ? "SOMA AUTO" : "R$ 0,00"}
+                                                disabled={inputDisabled}
+                                                className={`w-full bg-slate-800/80 border border-slate-700 rounded-xl p-2.5 text-xs font-black text-violet-100 focus:ring-2 focus:ring-violet-500 uppercase text-center transition-all ${inputDisabled ? 'opacity-60 cursor-not-allowed' : ''}`}
+                                            />
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-0.5">Saldo Livre</p>
+                                            <h4 className={`text-base font-black ${budgetBalanceMkt < 0 ? 'text-rose-400' : 'text-violet-400'}`}>
+                                                R$ {Number(budgetBalanceMkt).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                            </h4>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
@@ -1331,8 +1438,8 @@ export default function App() {
                                                     key={src}
                                                     type="button"
                                                     onClick={() => setFilterSource(src)}
-                                                    className={`flex-1 py-2 text-[10px] font-black uppercase rounded-lg transition-all ${filterSource === src
-                                                        ? (src === 'ACTINE' ? 'bg-amber-500 text-white shadow' : src === 'REGIONAL' ? 'bg-emerald-600 text-white shadow' : 'bg-slate-900 text-white shadow')
+                                                    className={`flex-1 py-2 px-0.5 text-[9px] font-black uppercase rounded-lg transition-all ${filterSource === src
+                                                        ? (SOURCE_BTN[src] || 'bg-slate-900 text-white shadow')
                                                         : 'text-slate-500'}`}
                                                 >
                                                     {src}
@@ -1380,52 +1487,9 @@ export default function App() {
                                 </div>
                             )}
 
-                            {(() => {
-                                const actineEntries = filteredFeedEntries
-                                    .filter(e => getEntrySource(e) === 'ACTINE')
-                                    .slice()
-                                    .sort((a, b) => {
-                                        const at = (a.createdAt && typeof a.createdAt.getTime === 'function') ? a.createdAt.getTime() : 0;
-                                        const bt = (b.createdAt && typeof b.createdAt.getTime === 'function') ? b.createdAt.getTime() : 0;
-                                        return bt - at;
-                                    });
-                                if (actineEntries.length === 0) return null;
-                                const actineTotal = actineEntries.reduce((acc, curr) => acc + parseCurrency(curr.value), 0);
-                                return (
-                                    <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
-                                        <div className="flex justify-between items-center mb-3 border-l-2 border-amber-500 pl-2">
-                                            <h3 className="text-[10px] font-black text-slate-800 uppercase tracking-widest">🧴 Extrato Verba Actine</h3>
-                                            <span className="text-[10px] font-black text-amber-600">R$ {Number(actineTotal).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} • {actineEntries.length}</span>
-                                        </div>
-                                        <div className="space-y-2 max-h-72 overflow-y-auto pr-2">
-                                            {actineEntries.map((e, i) => {
-                                                const dt = e.actionDate ? new Date(e.actionDate + 'T12:00:00').toLocaleDateString('pt-BR') : formatDate(e.createdAt);
-                                                return (
-                                                    <div key={e.id || i} className="border-b border-slate-50 pb-2 last:border-0">
-                                                        <div className="flex justify-between items-start gap-2">
-                                                            <div className="min-w-0 flex-1">
-                                                                <p className="text-[11px] font-black text-slate-800 uppercase truncate leading-tight">{String(e.doctorName || '-')}</p>
-                                                                <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                                                                    <span className="text-[8px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-bold">{String(e.crm || '-')}</span>
-                                                                    <span className="text-[8px] font-black uppercase text-amber-600">{String(e.category || '-')}</span>
-                                                                    <span className="text-[8px] font-bold text-slate-400 uppercase">📅 {dt}</span>
-                                                                </div>
-                                                                <p className="text-[10px] text-slate-500 font-bold uppercase truncate mt-0.5">{String(e.requesterName || '-')} • {String(e.actionType || '-')}</p>
-                                                                {e.observations && (
-                                                                    <p className="text-[9px] text-slate-400 italic mt-1 leading-snug overflow-hidden" style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
-                                                                        Det: {String(e.observations)}
-                                                                    </p>
-                                                                )}
-                                                            </div>
-                                                            <span className="font-black text-amber-600 shrink-0 text-xs">R$ {String(e.value || '0,00')}</span>
-                                                        </div>
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
-                                    </div>
-                                );
-                            })()}
+                            {renderSourceStatement('ACTINE', '🧴 Extrato Verba Actine', 'border-amber-500', 'text-amber-600')}
+
+                            {renderSourceStatement('MKT', '📣 Extrato Verba MKT', 'border-violet-500', 'text-violet-600')}
 
                             <div className="grid grid-cols-1 gap-4">
                                 {feedStatsByAction.length > 0 && (
@@ -1517,8 +1581,8 @@ export default function App() {
                                                 <div className="min-w-0 pr-4 text-left">
                                                     <div className="flex items-center gap-2 mb-2 flex-wrap">
                                                         <span className="text-[9px] font-black text-emerald-600 uppercase bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-100">{String(e.team || 'S/ Equipe')}</span>
-                                                        {getEntrySource(e) === 'ACTINE' && (
-                                                            <span className="text-[9px] font-black text-amber-600 uppercase bg-amber-50 px-2.5 py-1 rounded-full border border-amber-200">🧴 ACTINE</span>
+                                                        {getEntrySource(e) !== 'REGIONAL' && (
+                                                            <span className={`text-[9px] font-black uppercase px-2.5 py-1 rounded-full border ${SOURCE_CHIP[getEntrySource(e)]}`}>{SOURCE_LABELS[getEntrySource(e)]}</span>
                                                         )}
                                                         {formattedActionDate && (
                                                             <span className="text-[9px] font-bold text-slate-500 uppercase bg-slate-100 px-2.5 py-1 rounded-full border border-slate-200">📅 {formattedActionDate}</span>
